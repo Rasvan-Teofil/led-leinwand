@@ -1,5 +1,4 @@
-# Chair model license
+# Chair 3D model
 
-**Asset:** `chair.glb` (low-poly chair, seat + back)
-
-**License:** CC0 1.0 — generated for this project (`scripts/generate-chair-glb.mjs`). You may replace it with a Kenney / Quaternius chair GLB using the same path and update this file.
+- **Source:** [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) (`chairModernCushion.glb` via [shorepine/kenney](https://github.com/shorepine/kenney)) — Polstersitz und -lehne auf dünnem Metallgestell, wie die schwarzen Stapelstühle im Saal
+- **License:** [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) — public domain, no attribution required (support Kenney at https://kenney.nl/donate)

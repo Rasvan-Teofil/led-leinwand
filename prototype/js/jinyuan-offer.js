@@ -40,6 +40,23 @@ export const JINYUAN_COLUMN_STACK = [
   { w: 0.5, h: 1.0 },
 ];
 
+export function hasMixedColumnStack(config) {
+  return Array.isArray(config?.columnStack) && config.columnStack.length > 0;
+}
+
+export function mixedStackGridHint(config) {
+  if (!hasMixedColumnStack(config)) return null;
+  const cols = config.cols;
+  const stack = config.columnStack;
+  const heightM = stack.reduce((sum, c) => sum + c.h, 0);
+  const count500 = stack.filter((c) => c.h <= 0.55).length * cols;
+  const count1000 = stack.filter((c) => c.h > 0.55).length * cols;
+  return {
+    heightM,
+    label: `${config.widthM} × ${heightM.toFixed(2).replace(/\.00$/, '')} m — ${cols} Spalten: unten 500×500, 2× 500×1000 (${count1000}× 500×1000 + ${count500}× 500×500)`,
+  };
+}
+
 export function jinyuanWallConfig(overrides = {}) {
   return {
     offerId: JINYUAN_OFFER_ID,
@@ -48,7 +65,7 @@ export function jinyuanWallConfig(overrides = {}) {
     heightM: JINYUAN_QUOTE.heightM,
     pitchMm: JINYUAN_QUOTE.pitchMm,
     cols: JINYUAN_QUOTE.cols,
-    rows: 5,
+    rows: JINYUAN_COLUMN_STACK.length,
     cabinetWM: 0.5,
     cabinetHM: 0.5,
     cabinetDepthM: JINYUAN_QUOTE.cabinetDepthM,

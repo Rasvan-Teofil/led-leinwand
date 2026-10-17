@@ -7,60 +7,45 @@ import {
   snapWallToCabinetGrid,
 } from './calculations.js';
 import { createWallConfig } from './led-wall.js';
-import { jinyuanWallConfig } from './jinyuan-offer.js';
+import {
+  hasMixedColumnStack,
+  jinyuanWallConfig,
+  mixedStackGridHint,
+} from './jinyuan-offer.js';
 
-export function bindUi(app, root) {
+export function bindUi(app, panelRoot, viewportRoot) {
   const els = {
-    roomDepth: root.querySelector('#room-depth'),
-    roomWidth: root.querySelector('#room-width'),
-    roomHeight: root.querySelector('#room-height'),
-    wallSelect: root.querySelector('#wall-select'),
-    addWall: root.querySelector('#add-wall'),
-    removeWall: root.querySelector('#remove-wall'),
-    wallPreset: root.querySelector('#wall-preset'),
-    wallWidth: root.querySelector('#wall-width'),
-    wallHeight: root.querySelector('#wall-height'),
-    cols: root.querySelector('#cab-cols'),
-    rows: root.querySelector('#cab-rows'),
-    cabinetPreset: root.querySelector('#cabinet-preset'),
-    pitchPreset: root.querySelector('#pitch-preset'),
-    pitchCustom: root.querySelector('#pitch-custom'),
-    mountHeight: root.querySelector('#mount-height'),
-    contentType: root.querySelector('#content-type'),
-    compareMode: root.querySelector('#compare-mode'),
-    pitchToggle: root.querySelector('#pitch-toggle'),
-    altPitch: root.querySelector('#alt-pitch'),
-    gridHint: root.querySelector('#grid-size-hint'),
-    stats: root.querySelector('#stats-panel'),
-    viewDistance: root.querySelector('#view-distance'),
-    viewDistanceLabel: root.querySelector('#view-distance-label'),
-    presetFirst: root.querySelector('#view-first'),
-    presetMid: root.querySelector('#view-mid'),
-    presetBack: root.querySelector('#view-back'),
-    presetTech: root.querySelector('#view-tech'),
-    fpMode: root.querySelector('#fp-mode'),
+    wallSelect: panelRoot.querySelector('#wall-select'),
+    addWall: panelRoot.querySelector('#add-wall'),
+    removeWall: panelRoot.querySelector('#remove-wall'),
+    wallPreset: panelRoot.querySelector('#wall-preset'),
+    wallWidth: panelRoot.querySelector('#wall-width'),
+    wallHeight: panelRoot.querySelector('#wall-height'),
+    cols: panelRoot.querySelector('#cab-cols'),
+    rows: panelRoot.querySelector('#cab-rows'),
+    cabinetPreset: panelRoot.querySelector('#cabinet-preset'),
+    pitchPreset: panelRoot.querySelector('#pitch-preset'),
+    pitchCustom: panelRoot.querySelector('#pitch-custom'),
+    mountHeight: panelRoot.querySelector('#mount-height'),
+    contentType: panelRoot.querySelector('#content-type'),
+    compareMode: panelRoot.querySelector('#compare-mode'),
+    pitchToggle: panelRoot.querySelector('#pitch-toggle'),
+    altPitch: panelRoot.querySelector('#alt-pitch'),
+    gridHint: panelRoot.querySelector('#grid-size-hint'),
+    stats: panelRoot.querySelector('#stats-panel'),
+    viewDistance: viewportRoot.querySelector('#view-distance'),
+    viewDistanceLabel: viewportRoot.querySelector('#view-distance-label'),
+    presetFirst: viewportRoot.querySelector('#view-first'),
+    presetMid: viewportRoot.querySelector('#view-mid'),
+    presetBack: viewportRoot.querySelector('#view-back'),
+    presetTech: viewportRoot.querySelector('#view-tech'),
+    planView: viewportRoot.querySelector('#view-plan'),
+    fpMode: viewportRoot.querySelector('#fp-mode'),
   };
 
   fillPitchPresets(els.pitchPreset);
   fillCabinetPresets(els.cabinetPreset);
   fillWallPresets(els.wallPreset);
-
-  els.roomDepth.value = app.roomDims.hallDepthM;
-  els.roomWidth.value = app.roomDims.hallWidthM;
-  els.roomHeight.value = app.roomDims.roomHeightM;
-
-  const onRoomChange = () => {
-    app.setRoomDims({
-      hallDepthM: parseFloat(els.roomDepth.value),
-      hallWidthM: parseFloat(els.roomWidth.value),
-      roomHeightM: parseFloat(els.roomHeight.value),
-    });
-    els.viewDistance.max = app.roomDims.hallWidthM - 2;
-    refresh();
-  };
-  els.roomDepth.addEventListener('change', onRoomChange);
-  els.roomWidth.addEventListener('change', onRoomChange);
-  els.roomHeight.addEventListener('change', onRoomChange);
 
   els.addWall.addEventListener('click', () => {
     const cfg = createWallConfig({ label: `Wand ${app.walls.length + 1}` });
@@ -99,7 +84,22 @@ export function bindUi(app, root) {
     applyGrid(p.w, p.h);
   });
 
+  function updateMixedStackHint(config) {
+    const hint = mixedStackGridHint(config);
+    if (!hint) return;
+    els.wallWidth.value = config.widthM;
+    els.wallHeight.value = hint.heightM;
+    els.cols.value = config.cols;
+    els.rows.value = config.columnStack.length;
+    els.cabinetPreset.selectedIndex = 1;
+    if (els.gridHint) {
+      els.gridHint.textContent = `Effektive Wandgröße: ${hint.label}`;
+      els.gridHint.classList.remove('warn');
+    }
+  }
+
   const applyWallSize = () => {
+    if (hasMixedColumnStack(app.getSelectedWall()?.config)) return;
     const w = parseFloat(els.wallWidth.value);
     const h = parseFloat(els.wallHeight.value);
     const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
@@ -117,6 +117,12 @@ export function bindUi(app, root) {
   els.cabinetPreset.addEventListener('change', () => applyGrid());
 
   function applyGrid(targetW, targetH) {
+    const selected = app.getSelectedWall();
+    if (selected && hasMixedColumnStack(selected.config)) {
+      updateMixedStackHint(selected.config);
+      refresh();
+      return;
+    }
     const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
     const cols = parseInt(els.cols.value, 10);
     const rows = parseInt(els.rows.value, 10);
@@ -161,7 +167,7 @@ export function bindUi(app, root) {
   els.mountHeight.addEventListener('change', () => {
     const w = app.getSelectedWall();
     const h = parseFloat(els.mountHeight.value);
-    if (w) w.setMountHeight(h);
+    if (w && !Number.isNaN(h)) els.mountHeight.value = app.setMountHeight(w, h);
   });
 
   els.contentType.addEventListener('change', () => {
@@ -184,40 +190,53 @@ export function bindUi(app, root) {
     refreshStats();
   });
 
-  els.viewDistance.max = app.roomDims.hallWidthM - 2;
+  els.viewDistance.min = 1;
+  els.viewDistance.max = app.getMaxViewDistanceM().toFixed(1);
   els.viewDistance.value = app.getViewDistanceM();
   els.viewDistance.addEventListener('input', () => {
     const d = parseFloat(els.viewDistance.value);
     app.setViewDistanceM(d);
     els.viewDistanceLabel.textContent = `${d.toFixed(1)} m`;
+    markActiveView(null);
   });
 
-  els.presetFirst.addEventListener('click', () => {
-    app.setViewPreset('first');
-    syncDistanceSlider();
-  });
-  els.presetMid.addEventListener('click', () => {
-    app.setViewPreset('mid');
-    syncDistanceSlider();
-  });
-  els.presetBack.addEventListener('click', () => {
-    app.setViewPreset('back');
-    syncDistanceSlider();
-  });
-  els.presetTech.addEventListener('click', () => {
-    app.setViewPreset('tech');
-    syncDistanceSlider();
+  const presetButtons = [
+    [els.presetFirst, 'first'],
+    [els.presetMid, 'mid'],
+    [els.presetBack, 'back'],
+    [els.presetTech, 'tech'],
+  ];
+  for (const [btn, preset] of presetButtons) {
+    btn.addEventListener('click', () => {
+      app.setViewPreset(preset);
+      syncDistanceSlider();
+      markActiveView(btn);
+    });
+  }
+
+  els.planView.addEventListener('click', () => {
+    app.setPlanView(true);
+    markActiveView(els.planView);
   });
 
   els.fpMode.addEventListener('click', () => {
     app.enableFirstPerson(true);
+    markActiveView(els.fpMode);
   });
+
+  function markActiveView(active) {
+    for (const btn of [...presetButtons.map(([b]) => b), els.planView, els.fpMode]) {
+      btn.classList.toggle('active', btn === active);
+    }
+  }
+  markActiveView(els.presetFirst);
 
   function syncDistanceSlider() {
     const d = app.getViewDistanceM();
     els.viewDistance.value = d;
     els.viewDistanceLabel.textContent = `${d.toFixed(1)} m`;
   }
+  app.orbit.addEventListener('change', syncDistanceSlider);
 
   function syncWallFields() {
     const w = app.getSelectedWall();
@@ -226,7 +245,7 @@ export function bindUi(app, root) {
     els.wallWidth.value = c.widthM;
     els.wallHeight.value = c.heightM;
     els.cols.value = c.cols;
-    els.rows.value = c.rows;
+    els.rows.value = c.columnStack?.length ?? c.rows;
     els.pitchCustom.value = c.pitchMm;
     els.mountHeight.value = c.mountHeightM;
     els.contentType.value = c.content;
@@ -251,13 +270,24 @@ export function bindUi(app, root) {
   function refresh() {
     refreshWallSelect();
     syncWallFields();
+    const w = app.getSelectedWall();
+    if (w && hasMixedColumnStack(w.config)) {
+      updateMixedStackHint(w.config);
+    }
     refreshStats();
     syncDistanceSlider();
   }
 
   refreshWallSelect();
   syncWallFields();
-  applyGrid();
+  const initial = app.getSelectedWall();
+  if (initial && hasMixedColumnStack(initial.config)) {
+    updateMixedStackHint(initial.config);
+    refreshStats();
+  } else {
+    applyGrid();
+  }
+  syncDistanceSlider();
 }
 
 function fillPitchPresets(select) {

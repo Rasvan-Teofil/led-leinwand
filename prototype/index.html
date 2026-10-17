@@ -22,14 +22,6 @@
         </header>
 
         <section>
-          <h2>Raum (Gottesdienstraum)</h2>
-          <p class="field-hint">Maßstab: Bühne 8&nbsp;m (4×2&nbsp;m). Werte in <code>room-layout.js</code>.</p>
-          <label>Tiefe Saal (Z, m) <input type="number" id="room-depth" min="8" max="24" step="0.5" /></label>
-          <label>Breite Saal (X, m) <input type="number" id="room-width" min="12" max="35" step="0.5" /></label>
-          <label>Höhe (m) <input type="number" id="room-height" min="3" max="15" step="0.5" /></label>
-        </section>
-
-        <section>
           <h2>LED-Wände</h2>
           <label>Wand wählen
             <select id="wall-select"></select>
@@ -77,23 +69,24 @@
           </label>
         </section>
 
-        <section>
-          <h2>Kamera</h2>
-          <div class="btn-row">
-            <button type="button" id="view-first">Erste Reihe</button>
-            <button type="button" id="view-mid">Mitte</button>
-            <button type="button" id="view-back">Letzte Reihe</button>
-            <button type="button" id="view-tech">Tech-Pult</button>
-          </div>
-          <label>Abstand zur Wand: <span id="view-distance-label">—</span></label>
-          <input type="range" id="view-distance" min="2" max="16" step="0.1" />
-          <button type="button" id="fp-mode" class="secondary">Erste-Person (WASD, Maus)</button>
-        </section>
-
         <section id="stats-panel"></section>
       </aside>
       <main id="viewport">
         <canvas id="scene-canvas"></canvas>
+        <div id="view-overlay" class="view-overlay">
+          <div class="view-bar" role="toolbar" aria-label="Kamera">
+            <button type="button" id="view-first">Erste Reihe</button>
+            <button type="button" id="view-mid">Mitte</button>
+            <button type="button" id="view-back">Letzte Reihe</button>
+            <button type="button" id="view-tech">Tech-Pult</button>
+            <button type="button" id="view-plan" class="secondary">Draufsicht</button>
+            <button type="button" id="fp-mode" class="secondary">Erste-Person</button>
+          </div>
+          <label class="distance-control">
+            Abstand: <span id="view-distance-label">—</span>
+            <input type="range" id="view-distance" min="1" max="15" step="0.1" />
+          </label>
+        </div>
         <p class="hint">Maus: drehen/zoomen · Rechtsklick: schwenken</p>
       </main>
     </div>

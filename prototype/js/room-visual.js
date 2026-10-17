@@ -1,14 +1,17 @@
 import * as THREE from 'three';
 import { buildCeilingTrussGrid } from './box-truss.js';
 
-export function addCeilingStructure(group, layout, roomHeightM) {
-  group.add(buildCeilingTrussGrid(layout, roomHeightM));
+export function addCeilingStructure(group, layout, roomHeightM, planViewHidden = []) {
+  const trussGrid = buildCeilingTrussGrid(layout, roomHeightM);
+  planViewHidden.push(trussGrid);
+  group.add(trussGrid);
 
   const beamMat = new THREE.MeshStandardMaterial({ color: 0x121218, roughness: 0.96 });
-  const { hallWidthM } = layout;
-  for (let x = -hallWidthM / 2 + 1.5; x < hallWidthM / 2; x += 3.8) {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.42, layout.hallDepthM * 0.92), beamMat);
-    b.position.set(x, roomHeightM - 0.22, 0);
+  const { minX, maxX } = layout;
+  for (let x = minX + 2; x < maxX - 1; x += 4.2) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.42, layout.hallDepthM * 0.88), beamMat);
+    b.position.set(x, roomHeightM - 0.22, layout.centerZ);
+    planViewHidden.push(b);
     group.add(b);
   }
 }

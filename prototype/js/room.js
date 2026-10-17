@@ -36,15 +36,24 @@ export function buildRoom(uiDims) {
     roughness: 0.98,
   });
 
-  group.add(buildFootprintFloor(footprint, floorMat));
+  group.userData.planViewHidden = [];
+
+  const floor = buildFootprintFloor(footprint, floorMat);
+  group.add(floor);
+
   group.add(buildFootprintWalls(footprint, layout.roomHeightM, wallMat));
-  group.add(buildCeilingSlab(footprint, layout.roomHeightM, ceilMat));
+
+  const ceiling = buildCeilingSlab(footprint, layout.roomHeightM, ceilMat);
+  group.userData.planViewHidden.push(ceiling);
+  group.add(ceiling);
 
   addBackstage(group, layout);
   addStage(group, layout);
   addStageDressing(group, layout);
-  group.add(buildStageSurroundTruss(layout));
-  addCeilingStructure(group, layout, layout.roomHeightM);
+  const stageTruss = buildStageSurroundTruss(layout);
+  group.userData.planViewHidden.push(stageTruss);
+  group.add(stageTruss);
+  addCeilingStructure(group, layout, layout.roomHeightM, group.userData.planViewHidden);
   addWallCross(group, layout);
   addTechDesk(group, layout);
 

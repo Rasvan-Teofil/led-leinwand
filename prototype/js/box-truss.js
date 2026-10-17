@@ -1,9 +1,12 @@
 import * as THREE from 'three';
+
 export const TRUSS_SECTION_M = 0.29;
 export const TRUSS_TUBE_R = 0.026;
 export const TRUSS_SEGMENT_M = 2;
 
 const HALF = TRUSS_SECTION_M / 2;
+
+/** @typedef {{ p0: THREE.Vector3, p1: THREE.Vector3 }} TrussSegment */
 
 export function createTrussMaterials() {
   return {
@@ -25,22 +28,38 @@ export function createTrussMaterials() {
   };
 }
 
-/**
- * Sammelt Instanz-Matrizen für F34-4-Punkt-Boxtruss (4 Hauptrohre + Zickzack-Gitter).
- * axis: 'x' | 'y' | 'z' — Laufrichtung des Truss-Elements.
- */
+const FACE_CORNER_PAIRS = [
+  [0, 1],
+  [2, 3],
+  [0, 2],
+  [1, 3],
+];
+
 export class BoxTrussBuilder {
   constructor(materials = createTrussMaterials()) {
     this.materials = materials;
-    this.chordMats = [];
-    this.braceMats = [];
     this.plateMats = [];
-    this.chordGeo = new THREE.CylinderGeometry(TRUSS_TUBE_R, TRUSS_TUBE_R, 1, 10);
-    this.braceGeo = new THREE.CylinderGeometry(TRUSS_TUBE_R * 0.55, TRUSS_TUBE_R * 0.55, 1, 6);
+    /** @type {TrussSegment[]} */
+    this.chordSegments = [];
+    /** @type {TrussSegment[]} */
+    this.braceSegments = [];
     this.plateGeo = new THREE.BoxGeometry(TRUSS_SECTION_M + 0.03, 0.035, TRUSS_SECTION_M + 0.03);
+    this.baseMeshes = [];
   }
 
-  /** Gerade Truss-Linie von start → end (Weltkoordinaten). */
+  getDebugGeometry() {
+    return {
+      chords: this.chordSegments.map((s) => ({
+        p0: s.p0.clone(),
+        p1: s.p1.clone(),
+      })),
+      braces: this.braceSegments.map((s) => ({
+        p0: s.p0.clone(),
+        p1: s.p1.clone(),
+      })),
+    };
+  }
+
   addRun(start, end, { basePlate = false, basePlateAtStart = false } = {}) {
     const a = new THREE.Vector3(...start);
     const b = new THREE.Vector3(...end);
@@ -52,7 +71,6 @@ export class BoxTrussBuilder {
     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
-    const up = dir.clone();
 
     const corners = [
       new THREE.Vector3().addScaledVector(right, -HALF).addScaledVector(fwd, -HALF),
@@ -69,12 +87,10 @@ export class BoxTrussBuilder {
       const segEnd = a.clone().addScaledVector(dir, t + segLen);
 
       for (const c of corners) {
-        const p0 = segStart.clone().add(c);
-        const p1 = segEnd.clone().add(c);
-        this._addChord(p0, p1);
+        this._addChord(segStart.clone().add(c), segEnd.clone().add(c));
       }
 
-      this._addFaceBraces(segStart, segEnd, corners);
+      this._addFaceBraces(segStart, segEnd, corners, segIdx);
       if (segIdx > 0 || t > 0) {
         const mid = segStart.clone().addScaledVector(dir, 0.02);
         this._addCoupler(mid, quat);
@@ -89,57 +105,52 @@ export class BoxTrussBuilder {
   }
 
   _addChord(p0, p1) {
+    this.chordSegments.push({ p0: p0.clone(), p1: p1.clone() });
     const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
     const len = p0.distanceTo(p1);
     const dir = new THREE.Vector3().subVectors(p1, p0).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    const m = new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, len, 1));
-    this.chordMats.push(m);
   }
 
-  _addFaceBraces(segStart, segEnd, corners) {
-    const pairs = [
-      [0, 1],
-      [2, 3],
-      [0, 2],
-      [1, 3],
-    ];
-    for (const [i, j] of pairs) {
-      this._addBrace(segStart.clone().add(corners[i]), segEnd.clone().add(corners[j]));
-      this._addBrace(segStart.clone().add(corners[j]), segEnd.clone().add(corners[i]));
+  /** Zickzack auf jeder Fläche zwischen zwei benachbarten Hauptrohren. */
+  _addFaceBraces(segStart, segEnd, corners, segIdx) {
+    for (const [ia, ib] of FACE_CORNER_PAIRS) {
+      const pA0 = segStart.clone().add(corners[ia]);
+      const pA1 = segStart.clone().add(corners[ib]);
+      const pB0 = segEnd.clone().add(corners[ia]);
+      const pB1 = segEnd.clone().add(corners[ib]);
+      if (segIdx % 2 === 0) {
+        this._addBrace(pA0, pB1);
+      } else {
+        this._addBrace(pA1, pB0);
+      }
     }
   }
 
   _addBrace(p0, p1) {
-    const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
     const len = p0.distanceTo(p1);
-    if (len < 0.08) return;
+    if (len < 0.05 || len > TRUSS_SEGMENT_M + TRUSS_SECTION_M + 0.15) return;
+    this.braceSegments.push({ p0: p0.clone(), p1: p1.clone() });
+    const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
     const dir = new THREE.Vector3().subVectors(p1, p0).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    const m = new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, len, 1));
-    this.braceMats.push(m);
   }
 
   _addCoupler(center, quat) {
-    const m = new THREE.Matrix4().compose(
-      center,
-      quat,
-      new THREE.Vector3(1, 1, 1)
-    );
+    const m = new THREE.Matrix4().compose(center, quat, new THREE.Vector3(1, 1, 1));
     this.plateMats.push(m);
   }
 
   _addBasePlate(pos, quat) {
-    const plate = new THREE.BoxGeometry(TRUSS_SECTION_M + 0.08, 0.025, TRUSS_SECTION_M + 0.08);
-    const mesh = new THREE.Mesh(plate, this.materials.plate);
-    mesh.position.copy(pos);
-    mesh.setRotationFromQuaternion(quat);
-    mesh.userData.isTrussBase = true;
-    if (!this.baseMeshes) this.baseMeshes = [];
-    this.baseMeshes.push(mesh);
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(TRUSS_SECTION_M + 0.08, 0.025, TRUSS_SECTION_M + 0.08),
+      this.materials.plate
+    );
+    plate.position.copy(pos);
+    plate.setRotationFromQuaternion(quat);
+    this.baseMeshes.push(plate);
   }
 
-  /** Bühnen-Portal (Lageplan-Rahmen), Front (+X) optional offen. */
   addPortalFrame({ xMin, xMax, zMin, zMax, y, openXMax = false }) {
     const legs = [
       [xMin, zMin],
@@ -162,65 +173,69 @@ export class BoxTrussBuilder {
     const g = new THREE.Group();
     g.name = 'box-truss-system';
 
-    if (this.chordMats.length) {
-      const mesh = new THREE.InstancedMesh(this.chordGeo, this.materials.chord, this.chordMats.length);
-      this.chordMats.forEach((mat, i) => mesh.setMatrixAt(i, mat));
-      mesh.instanceMatrix.needsUpdate = true;
-      g.add(mesh);
+    for (const { p0, p1 } of this.chordSegments) {
+      const tube = tubeBetween(p0, p1, TRUSS_TUBE_R, this.materials.chord);
+      if (tube) g.add(tube);
     }
-    if (this.braceMats.length) {
-      const mesh = new THREE.InstancedMesh(this.braceGeo, this.materials.brace, this.braceMats.length);
-      this.braceMats.forEach((mat, i) => mesh.setMatrixAt(i, mat));
-      mesh.instanceMatrix.needsUpdate = true;
-      g.add(mesh);
+    for (const { p0, p1 } of this.braceSegments) {
+      const tube = tubeBetween(p0, p1, TRUSS_TUBE_R * 0.55, this.materials.brace);
+      if (tube) g.add(tube);
     }
-    if (this.plateMats.length) {
-      const mesh = new THREE.InstancedMesh(this.plateGeo, this.materials.plate, this.plateMats.length);
-      this.plateMats.forEach((mat, i) => mesh.setMatrixAt(i, mat));
-      mesh.instanceMatrix.needsUpdate = true;
-      g.add(mesh);
+    for (const mat of this.plateMats) {
+      const plate = new THREE.Mesh(this.plateGeo, this.materials.plate);
+      plate.matrixAutoUpdate = false;
+      plate.matrix.copy(mat);
+      plate.matrix.decompose(plate.position, plate.quaternion, plate.scale);
+      plate.matrixAutoUpdate = true;
+      g.add(plate);
     }
-    for (const m of this.baseMeshes ?? []) g.add(m);
+    for (const m of this.baseMeshes) g.add(m);
 
     return g;
   }
 }
 
-/** Einfache Gitter-Decke aus Truss-Läufen. */
+function tubeBetween(p0, p1, radius, material) {
+  const len = p0.distanceTo(p1);
+  if (len < 0.01) return null;
+  const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+  const dir = new THREE.Vector3().subVectors(p1, p0).normalize();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 10), material);
+  mesh.position.copy(mid);
+  mesh.quaternion.copy(q);
+  return mesh;
+}
+
+/** Dezentes Deckenraster über Bühne und vorderes Publikum (Foto 2). */
 export function buildCeilingTrussGrid(layout, roomHeightM) {
   const b = new BoxTrussBuilder();
-  const y = roomHeightM - 0.38;
-  const { stage, maxX, ledPlaneX } = layout;
-  const x0 = stage.xMin - 1;
-  const x1 = maxX - 1.5;
-  const z0 = stage.zMin - 2.5;
-  const z1 = stage.zMax + 2.5;
+  const y = roomHeightM - 0.42;
+  const { stage, ledPlaneX } = layout;
+  const z0 = stage.zMin - 1.2;
+  const z1 = stage.zMax + 1.2;
+  const xFront = ledPlaneX + 7.5;
 
-  const zLines = 5;
-  for (let i = 0; i < zLines; i++) {
-    const z = z0 + (i / (zLines - 1)) * (z1 - z0);
-    b.addRun([x0, y, z], [x1, y, z]);
+  for (const z of [z0, 0, z1]) {
+    b.addRun([stage.xMin - 0.5, y, z], [xFront, y, z]);
   }
-  const xLines = 7;
-  for (let i = 0; i < xLines; i++) {
-    const x = x0 + (i / (xLines - 1)) * (x1 - x0);
-    b.addRun([x, y, z0], [x, y, z1]);
-  }
-  const overStageY = y - 0.15;
-  b.addRun([ledPlaneX + 0.5, overStageY, z0], [ledPlaneX + 0.5, overStageY, z1]);
-  return b.toGroup();
+  b.addRun([ledPlaneX + 1.5, y, z0], [ledPlaneX + 1.5, y, z1]);
+  b.addRun([xFront, y, z0], [xFront, y, z1]);
+
+  const group = b.toGroup();
+  group.name = 'ceiling-truss-grid';
+  return group;
 }
 
 export function buildStageSurroundTruss(layout) {
   const b = new BoxTrussBuilder();
   const { truss } = layout;
-  const y = truss.heightM;
   b.addPortalFrame({
     xMin: truss.xMin,
     xMax: truss.xMax,
     zMin: truss.zMin,
     zMax: truss.zMax,
-    y,
+    y: truss.heightM,
     openXMax: truss.openFront,
   });
   return b.toGroup();

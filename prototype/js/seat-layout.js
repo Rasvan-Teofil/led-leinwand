@@ -10,7 +10,7 @@ export function collectSeatTransforms(layout) {
     const x = baseX + row * (seatD + 0.35);
     for (let c = 0; c < 4; c++) {
       const z = -1.05 + c * (seatW + 0.12);
-      out.push({ x, z, rotY: -Math.PI / 2 });
+      out.push({ x, z, rotY: Math.PI / 2 });
     }
   }
 
@@ -19,7 +19,7 @@ export function collectSeatTransforms(layout) {
     const angle = 0.22;
     for (let c = 0; c < 3; c++) {
       const z = stage.zMin + 1.2 + c * (seatW + 0.15);
-      out.push({ x, z, rotY: -Math.PI / 2 - angle });
+      out.push({ x, z, rotY: Math.PI / 2 - angle });
     }
   }
 
@@ -28,7 +28,7 @@ export function collectSeatTransforms(layout) {
     const angle = -0.22;
     for (let c = 0; c < 3; c++) {
       const z = stage.zMax - 1.2 - c * (seatW + 0.15);
-      out.push({ x, z, rotY: -Math.PI / 2 - angle });
+      out.push({ x, z, rotY: Math.PI / 2 - angle });
     }
   }
 

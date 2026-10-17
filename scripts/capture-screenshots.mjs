@@ -63,17 +63,17 @@ await captureFullPage(page, '02-first-row.png', () => {
   app.orbit.target.set(px + 0.4, cy + 0.15, 0);
 });
 
-await captureFullPage(page, '03-pixel-closeup.png', () => {
+await captureFullPage(page, '04-side-stage.png', () => {
   const app = window.__ledApp;
-  app.walls.forEach((w) => w.setFlatBlend(0));
+  app.walls.forEach((w) => w.setFlatBlend(0.75));
   const L = app.layout;
   const px = L.ledPlaneX ?? L.wallX;
   const w = app.getSelectedWall();
   const cy = w.config.mountHeightM + w.config.heightM / 2;
-  app.camera.fov = 30;
+  app.camera.fov = 48;
   app.camera.updateProjectionMatrix();
-  app.camera.position.set(px + 1.55, 2.05, 0.35);
-  app.orbit.target.set(px + 0.06, cy, 0);
+  app.camera.position.set(px + 6.2, 2.35, -7.8);
+  app.orbit.target.set(px + 0.15, cy + 0.25, 0);
 });
 
 await browser.close();

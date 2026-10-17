@@ -7,7 +7,11 @@ import {
   snapWallToCabinetGrid,
 } from './calculations.js';
 import { createWallConfig } from './led-wall.js';
-import { jinyuanWallConfig } from './jinyuan-offer.js';
+import {
+  hasMixedColumnStack,
+  jinyuanWallConfig,
+  mixedStackGridHint,
+} from './jinyuan-offer.js';
 
 export function bindUi(app, panelRoot, viewportRoot) {
   const els = {
@@ -79,7 +83,22 @@ export function bindUi(app, panelRoot, viewportRoot) {
     applyGrid(p.w, p.h);
   });
 
+  function updateMixedStackHint(config) {
+    const hint = mixedStackGridHint(config);
+    if (!hint) return;
+    els.wallWidth.value = config.widthM;
+    els.wallHeight.value = hint.heightM;
+    els.cols.value = config.cols;
+    els.rows.value = config.columnStack.length;
+    els.cabinetPreset.selectedIndex = 1;
+    if (els.gridHint) {
+      els.gridHint.textContent = `Effektive Wandgröße: ${hint.label}`;
+      els.gridHint.classList.remove('warn');
+    }
+  }
+
   const applyWallSize = () => {
+    if (hasMixedColumnStack(app.getSelectedWall()?.config)) return;
     const w = parseFloat(els.wallWidth.value);
     const h = parseFloat(els.wallHeight.value);
     const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
@@ -97,6 +116,12 @@ export function bindUi(app, panelRoot, viewportRoot) {
   els.cabinetPreset.addEventListener('change', () => applyGrid());
 
   function applyGrid(targetW, targetH) {
+    const selected = app.getSelectedWall();
+    if (selected && hasMixedColumnStack(selected.config)) {
+      updateMixedStackHint(selected.config);
+      refresh();
+      return;
+    }
     const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
     const cols = parseInt(els.cols.value, 10);
     const rows = parseInt(els.rows.value, 10);
@@ -206,7 +231,7 @@ export function bindUi(app, panelRoot, viewportRoot) {
     els.wallWidth.value = c.widthM;
     els.wallHeight.value = c.heightM;
     els.cols.value = c.cols;
-    els.rows.value = c.rows;
+    els.rows.value = c.columnStack?.length ?? c.rows;
     els.pitchCustom.value = c.pitchMm;
     els.mountHeight.value = c.mountHeightM;
     els.contentType.value = c.content;
@@ -231,13 +256,23 @@ export function bindUi(app, panelRoot, viewportRoot) {
   function refresh() {
     refreshWallSelect();
     syncWallFields();
+    const w = app.getSelectedWall();
+    if (w && hasMixedColumnStack(w.config)) {
+      updateMixedStackHint(w.config);
+    }
     refreshStats();
     syncDistanceSlider();
   }
 
   refreshWallSelect();
   syncWallFields();
-  applyGrid();
+  const initial = app.getSelectedWall();
+  if (initial && hasMixedColumnStack(initial.config)) {
+    updateMixedStackHint(initial.config);
+    refreshStats();
+  } else {
+    applyGrid();
+  }
 }
 
 function fillPitchPresets(select) {

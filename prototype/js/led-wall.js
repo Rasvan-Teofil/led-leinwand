@@ -4,6 +4,8 @@ import {
   clampTextureResolution,
 } from './calculations.js';
 import { createLyricsCanvas, createPhotoCanvas } from './content-textures.js';
+import { JINYUAN_COLUMN_STACK, jinyuanWallConfig } from './jinyuan-offer.js';
+import { buildHangingTruss } from './led-truss.js';
 
 const LED_VERTEX = `
 varying vec2 vUv;
@@ -18,9 +20,22 @@ uniform sampler2D uMap;
 uniform vec2 uResolution;
 uniform vec3 uGapColor;
 uniform float uLedFill;
+uniform float uFlatBlend;
+uniform float uCabinetCols;
 varying vec2 vUv;
 
+float cabinetSeam(vec2 uv) {
+  float sx = min(fract(uv.x * uCabinetCols), 1.0 - fract(uv.x * uCabinetCols));
+  float s = smoothstep(0.0, 0.018, sx) * smoothstep(0.0, 0.018, 1.0 - sx);
+  float h1 = abs(uv.y - 0.2);
+  float h2 = abs(uv.y - 0.6);
+  float sy = min(h1, h2);
+  float sh = smoothstep(0.0, 0.012, sy);
+  return 1.0 - min(s, sh);
+}
+
 void main() {
+  vec3 blended = texture2D(uMap, vUv).rgb;
   vec2 pix = vUv * uResolution;
   vec2 cell = fract(pix);
   vec2 idx = floor(pix);
@@ -29,8 +44,14 @@ void main() {
   vec2 centered = cell - 0.5;
   float d = max(abs(centered.x), abs(centered.y));
   float mask = step(d, uLedFill * 0.5);
-  vec3 outColor = mix(uGapColor, color, mask);
-  gl_FragColor = vec4(outColor, 1.0);
+  vec3 dotted = mix(uGapColor, color, mask);
+  float ledSpan = max(length(dFdx(pix)), length(dFdy(pix)));
+  float autoBlend = smoothstep(0.55, 1.05, ledSpan);
+  float blend = max(uFlatBlend, autoBlend);
+  vec3 outRgb = mix(dotted, blended, blend);
+  float seam = cabinetSeam(vUv);
+  outRgb *= mix(0.72, 1.0, seam);
+  gl_FragColor = vec4(outRgb, 1.0);
 }
 `;
 
@@ -39,17 +60,8 @@ let wallIdCounter = 0;
 export function createWallConfig(overrides = {}) {
   return {
     id: `wall-${++wallIdCounter}`,
-    label: overrides.label ?? 'LED-Wand',
-    widthM: overrides.widthM ?? 4,
-    heightM: overrides.heightM ?? 2.25,
-    pitchMm: overrides.pitchMm ?? 3.9,
-    cols: overrides.cols ?? 8,
-    rows: overrides.rows ?? 5,
-    cabinetWM: overrides.cabinetWM ?? 0.5,
-    cabinetHM: overrides.cabinetHM ?? 0.5,
-    mountHeightM: overrides.mountHeightM ?? 1.0,
-    offsetXM: overrides.offsetXM ?? 0,
-    content: overrides.content ?? 'lyrics',
+    ...jinyuanWallConfig(),
+    ...overrides,
   };
 }
 
@@ -61,24 +73,16 @@ export class LedWallMesh {
     this.texture = null;
     this.material = null;
     this.mesh = null;
-    this.frame = null;
+    this.cabinetGroup = null;
+    this.trussGroup = null;
     this._build();
   }
 
   _build() {
-    if (this.mesh) {
-      this.group.remove(this.mesh);
-      this.mesh.geometry.dispose();
-    }
-    if (this.frame) {
-      this.group.remove(this.frame);
-      this.frame.geometry.dispose();
-      this.frame.material.dispose();
-    }
-    if (this.material) this.material.dispose();
-    if (this.texture) this.texture.dispose();
+    this._disposeParts();
 
-    const { widthM, heightM, pitchMm, content } = this.config;
+    const { widthM, heightM, pitchMm, content, cols, cabinetDepthM, columnStack } =
+      this.config;
     const res = resolutionFromWall(widthM, heightM, pitchMm);
     const clamped = clampTextureResolution(res.widthPx, res.heightPx);
 
@@ -88,41 +92,90 @@ export class LedWallMesh {
         : createLyricsCanvas(clamped.widthPx, clamped.heightPx);
 
     this.texture = new THREE.CanvasTexture(canvas);
-    this.texture.minFilter = THREE.NearestFilter;
-    this.texture.magFilter = THREE.NearestFilter;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.magFilter = THREE.LinearFilter;
+    this.texture.generateMipmaps = false;
     this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.needsUpdate = true;
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uMap: { value: this.texture },
-        uResolution: {
-          value: new THREE.Vector2(clamped.widthPx, clamped.heightPx),
-        },
+        uResolution: { value: new THREE.Vector2(clamped.widthPx, clamped.heightPx) },
         uGapColor: { value: new THREE.Color(0x080808) },
         uLedFill: { value: 0.88 },
+        uFlatBlend: { value: 0 },
+        uCabinetCols: { value: cols },
       },
       vertexShader: LED_VERTEX,
       fragmentShader: LED_FRAGMENT,
+      extensions: { derivatives: true },
     });
 
     const geo = new THREE.PlaneGeometry(widthM, heightM);
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.position.set(0, heightM / 2, 0);
+    this.mesh.renderOrder = 3;
     this.group.add(this.mesh);
 
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: 0x222222,
-      metalness: 0.4,
-      roughness: 0.6,
-    });
-    const frameDepth = 0.08;
-    const frameGeo = new THREE.BoxGeometry(widthM + 0.12, heightM + 0.12, frameDepth);
-    this.frame = new THREE.Mesh(frameGeo, frameMat);
-    this.frame.position.set(0, heightM / 2, -frameDepth / 2 - 0.02);
-    this.group.add(this.frame);
+    this.cabinetGroup = this._buildCabinetBoxes(widthM, columnStack, cabinetDepthM);
+    this.group.add(this.cabinetGroup);
+
+    this.trussGroup = buildHangingTruss(widthM, heightM, 0);
+    this.group.add(this.trussGroup);
 
     this._applyTransform();
+  }
+
+  _buildCabinetBoxes(widthM, columnStack, depthM) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x141418,
+      metalness: 0.75,
+      roughness: 0.28,
+    });
+    const colW = widthM / (this.config.cols || 8);
+    let y = 0;
+    const stack = columnStack ?? JINYUAN_COLUMN_STACK;
+    for (const cell of stack) {
+      for (let c = 0; c < this.config.cols; c++) {
+        const x = -widthM / 2 + colW / 2 + c * colW;
+        const box = new THREE.Mesh(
+          new THREE.BoxGeometry(colW - 0.004, cell.h - 0.004, depthM),
+          mat
+        );
+        box.position.set(x, y + cell.h / 2, -depthM / 2 - 0.01);
+        g.add(box);
+      }
+      y += cell.h;
+    }
+    return g;
+  }
+
+  _disposeParts() {
+    if (this.mesh) {
+      this.group.remove(this.mesh);
+      this.mesh.geometry.dispose();
+    }
+    if (this.cabinetGroup) {
+      this.group.remove(this.cabinetGroup);
+      this.cabinetGroup.traverse((o) => {
+        if (o.isMesh) {
+          o.geometry.dispose();
+          o.material.dispose();
+        }
+      });
+    }
+    if (this.trussGroup) {
+      this.group.remove(this.trussGroup);
+      this.trussGroup.traverse((o) => {
+        if (o.isMesh) {
+          o.geometry.dispose();
+          o.material.dispose();
+        }
+      });
+    }
+    if (this.material) this.material.dispose();
+    if (this.texture) this.texture.dispose();
   }
 
   _applyTransform() {
@@ -130,7 +183,6 @@ export class LedWallMesh {
     this.group.position.set(this.group.position.x, mountHeightM, offsetXM);
   }
 
-  /** Versatz entlang der Bühnenwand (Z-Achse im Raum). */
   setOffsetXM(alongWallZ) {
     this.config.offsetXM = alongWallZ;
     this.group.position.z = alongWallZ;
@@ -150,30 +202,39 @@ export class LedWallMesh {
     this.updateConfig({ pitchMm });
   }
 
+  setFlatBlend(t) {
+    if (this.material?.uniforms?.uFlatBlend) {
+      this.material.uniforms.uFlatBlend.value = THREE.MathUtils.clamp(t, 0, 1);
+    }
+  }
+
   getStats() {
-    const { widthM, heightM, pitchMm, cols, rows, cabinetWM, cabinetHM } =
+    const { widthM, heightM, pitchMm, cols, rows, cabinetWM, cabinetHM, offerId } =
       this.config;
     const res = resolutionFromWall(widthM, heightM, pitchMm);
     const clamped = clampTextureResolution(res.widthPx, res.heightPx);
+    const stack = this.config.columnStack ?? JINYUAN_COLUMN_STACK;
+    const count =
+      cols * stack.length +
+      (stack.length === 3 ? 0 : 0);
     return {
       res,
       clamped,
       widthM,
       heightM,
       pitchMm,
-      cabinets: { cols, rows, count: cols * rows, cabinetWM, cabinetHM },
+      offerId,
+      cabinets: {
+        cols,
+        rows: stack.length,
+        count: cols * stack.length,
+        cabinetWM,
+        cabinetHM,
+      },
     };
   }
 
   dispose() {
-    if (this.mesh) {
-      this.mesh.geometry.dispose();
-      this.material?.dispose();
-      this.texture?.dispose();
-    }
-    if (this.frame) {
-      this.frame.geometry.dispose();
-      this.frame.material.dispose();
-    }
+    this._disposeParts();
   }
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { resolveRoomLayout } from './room-layout.js';
+import { createChairInstances, preloadChairTemplate } from './chair-instances.js';
 
 export function buildRoom(uiDims) {
   const layout = resolveRoomLayout({
@@ -44,13 +45,30 @@ export function buildRoom(uiDims) {
   group.add(ceil);
 
   addOuterWalls(group, layout, wallMat);
+  addBackstage(group, layout);
   addStage(group, layout);
   addTruss(group, layout);
-  addSeating(group, layout);
   addRugAndChairs(group, layout);
   addTechDesk(group, layout);
 
   return group;
+}
+
+export async function attachAudienceChairs(roomGroup, chairTemplate) {
+  if (roomGroup.userData.chairMesh) {
+    roomGroup.remove(roomGroup.userData.chairMesh);
+    roomGroup.userData.chairMesh.geometry.dispose();
+  }
+  const layout = roomGroup.userData.layout;
+  const chairs = createChairInstances(layout, chairTemplate);
+  if (chairs) {
+    roomGroup.add(chairs);
+    roomGroup.userData.chairMesh = chairs;
+  }
+}
+
+export async function ensureChairTemplate() {
+  return preloadChairTemplate();
 }
 
 function addOuterWalls(group, layout, wallMat) {
@@ -66,23 +84,17 @@ function addOuterWalls(group, layout, wallMat) {
   front.rotation.y = Math.PI;
   group.add(front);
 
-  const left = wallPlane(hallDepthM, h, wallMat);
-  left.rotation.y = Math.PI / 2;
-  left.position.set(-halfW, h / 2, 0);
-  group.add(left);
-
   const right = wallPlane(hallDepthM, h, wallMat);
   right.rotation.y = -Math.PI / 2;
   right.position.set(halfW, h / 2, 0);
   group.add(right);
 
-  // Vereinfachte „Nischen“ (Seitenräume nur als Wandvorsprünge)
   const bumpMat = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.9 });
   const bumpN = new THREE.Mesh(new THREE.BoxGeometry(2.2, h, 1.4), bumpMat);
   bumpN.position.set(halfW - 1.1, h / 2, halfD - 2.2);
   group.add(bumpN);
   const bumpS = new THREE.Mesh(new THREE.BoxGeometry(2.8, h, 1.6), bumpMat);
-  bumpS.position.set(-halfW + 3.5, h / 2, halfD - 1.8);
+  bumpS.position.set(halfW - 3.5, h / 2, halfD - 1.8);
   group.add(bumpS);
 }
 
@@ -90,29 +102,93 @@ function wallPlane(w, h, mat) {
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
 }
 
+function addBackstage(group, layout) {
+  const { backstage, roomHeightM, stage } = layout;
+  const h = roomHeightM;
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x3d3d42, roughness: 0.9 });
+  const w = backstage.xMax - backstage.xMin;
+  const d = backstage.zMax - backstage.zMin;
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), floorMat);
+  floor.position.set(
+    (backstage.xMin + backstage.xMax) / 2,
+    0.04,
+    (backstage.zMin + backstage.zMax) / 2
+  );
+  group.add(floor);
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc8c4bc, roughness: 0.92 });
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.15, h, d), wallMat);
+  wall.position.set(backstage.xMin, h / 2, (backstage.zMin + backstage.zMax) / 2);
+  group.add(wall);
+
+  const benchMat = new THREE.MeshStandardMaterial({ color: 0xd4b84a, roughness: 0.75 });
+  for (let i = 0; i < 3; i++) {
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.45, 0.55), benchMat);
+    bench.position.set(
+      backstage.xMin + 1.2,
+      0.225,
+      stage.zMin + 1.5 + i * 2.2
+    );
+    group.add(bench);
+  }
+  const label = makeLabel('Backstage / Bank');
+  label.position.set(backstage.xMin + 1.5, 2.2, 0);
+  group.add(label);
+}
+
+function makeLabel(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, 256, 64);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 38);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(2.2, 0.55, 1);
+  return sprite;
+}
+
 function addStage(group, layout) {
   const { stage } = layout;
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.75 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.78 });
   const depth = stage.xMax - stage.xMin;
   const length = stage.zMax - stage.zMin;
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.35, length), mat);
+  const h = stage.heightM;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(depth, h, length), mat);
   mesh.position.set(
     (stage.xMin + stage.xMax) / 2,
-    0.175,
+    h / 2,
     (stage.zMin + stage.zMax) / 2
   );
   mesh.receiveShadow = true;
+  mesh.castShadow = true;
   group.add(mesh);
+
+  for (let i = 1; i < 4; i++) {
+    const zx = stage.xMin + (depth / 4) * i;
+    const line = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, h + 0.002, length),
+      new THREE.MeshStandardMaterial({ color: 0x6d3810 })
+    );
+    line.position.set(zx, h / 2, (stage.zMin + stage.zMax) / 2);
+    group.add(line);
+  }
 }
 
 function addTruss(group, layout) {
   const { truss } = layout;
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xdddddd,
-    metalness: 0.55,
-    roughness: 0.35,
+    color: 0xe8e8ee,
+    metalness: 0.5,
+    roughness: 0.4,
   });
-  const t = 0.12;
+  const t = 0.14;
   const h = truss.heightM;
   const cx = (truss.xMin + truss.xMax) / 2;
   const cz = (truss.zMin + truss.zMax) / 2;
@@ -123,8 +199,10 @@ function addTruss(group, layout) {
     [dx, h, t, cx, h / 2, truss.zMin],
     [dx, h, t, cx, h / 2, truss.zMax],
     [t, h, dz, truss.xMin, h / 2, cz],
-    [t, h, dz, truss.xMax, h / 2, cz],
   ];
+  if (!truss.openFront) {
+    pieces.push([t, h, dz, truss.xMax, h / 2, cz]);
+  }
   for (const [w, hh, d, x, y, z] of pieces) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), mat);
     m.position.set(x, y, z);
@@ -132,52 +210,9 @@ function addTruss(group, layout) {
   }
 }
 
-function addSeating(group, layout) {
-  const seatMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.85 });
-  const { seatW, seatD, seatH, wallX, stage } = layout;
-  const s = layout.scale;
-  const baseX = stage.xMax + layout.aisleFromStageM * s;
-
-  // Mitte: 5 Reihen × 4 Stühle, gerade zur Bühne
-  for (let row = 0; row < 5; row++) {
-    const x = baseX + row * (seatD + 0.35);
-    for (let c = 0; c < 4; c++) {
-      const z = -1.05 + c * (seatW + 0.12);
-      addSeat(group, seatMat, x, z, 0, seatW, seatD, seatH);
-    }
-  }
-
-  // Oben: 3 Reihen, leicht angewinkelt
-  for (let row = 0; row < 3; row++) {
-    const x = baseX + 0.4 + row * (seatD + 0.38);
-    const angle = 0.22;
-    for (let c = 0; c < 3; c++) {
-      const z = stage.zMin + 1.2 + c * (seatW + 0.15);
-      addSeat(group, seatMat, x, z, -angle, seatW, seatD, seatH);
-    }
-  }
-
-  // Unten: 3 Reihen, angewinkelt
-  for (let row = 0; row < 3; row++) {
-    const x = baseX + 0.4 + row * (seatD + 0.38);
-    const angle = -0.22;
-    for (let c = 0; c < 3; c++) {
-      const z = stage.zMax - 1.2 - c * (seatW + 0.15);
-      addSeat(group, seatMat, x, z, angle, seatW, seatD, seatH);
-    }
-  }
-}
-
-function addSeat(group, mat, x, z, rotY, w, d, h) {
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(d, h, w), mat);
-  seat.position.set(x + d / 2, h / 2, z);
-  seat.rotation.y = rotY;
-  group.add(seat);
-}
-
 function addRugAndChairs(group, layout) {
-  const { wallX, halfW, scale: s } = layout;
-  const rugX = wallX + 11.5 * s;
+  const { ledPlaneX, halfW, scale: s } = layout;
+  const rugX = ledPlaneX + 11.5 * s;
   const rugZ = 0;
   const rug = new THREE.Mesh(
     new THREE.PlaneGeometry(layout.rugSizeX * s, layout.rugSizeZ * s),
@@ -186,17 +221,6 @@ function addRugAndChairs(group, layout) {
   rug.rotation.x = -Math.PI / 2;
   rug.position.set(rugX, 0.02, rugZ);
   group.add(rug);
-
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.8 });
-  for (const [ox, oz, rot] of [
-    [-0.7, -0.5, 0.5],
-    [0.8, 0.6, -2.2],
-  ]) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.7, 0.75), chairMat);
-    c.position.set(rugX + ox * s, 0.35, rugZ + oz * s);
-    c.rotation.y = rot;
-    group.add(c);
-  }
 }
 
 function addTechDesk(group, layout) {

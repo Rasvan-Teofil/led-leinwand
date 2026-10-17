@@ -2,10 +2,12 @@ import {
   PITCH_PRESETS_MM,
   CABINET_PRESETS,
   WALL_SIZE_PRESETS,
+  OFFER_PRESETS,
   gridFromWallAndCabinet,
   snapWallToCabinetGrid,
 } from './calculations.js';
 import { createWallConfig } from './led-wall.js';
+import { jinyuanWallConfig } from './jinyuan-offer.js';
 
 export function bindUi(app, root) {
   const els = {
@@ -80,7 +82,13 @@ export function bindUi(app, root) {
   });
 
   els.wallPreset.addEventListener('change', () => {
-    const idx = els.wallPreset.selectedIndex - 1;
+    const opt = els.wallPreset.options[els.wallPreset.selectedIndex];
+    if (opt?.dataset?.offerId === 'jinyuan-p391') {
+      app.updateSelectedWall(jinyuanWallConfig());
+      refresh();
+      return;
+    }
+    const idx = els.wallPreset.selectedIndex - OFFER_PRESETS.length - 1;
     if (idx < 0) return;
     const p = WALL_SIZE_PRESETS[idx];
     if (!p) return;
@@ -259,7 +267,7 @@ function fillPitchPresets(select) {
     o.textContent = `${p} mm`;
     select.appendChild(o);
   }
-  select.value = '3.9';
+  select.value = '3.91';
 }
 
 function fillCabinetPresets(select) {
@@ -275,9 +283,16 @@ function fillWallPresets(select) {
   const empty = document.createElement('option');
   empty.textContent = '— Preset wählen —';
   select.appendChild(empty);
+  for (const p of OFFER_PRESETS) {
+    const o = document.createElement('option');
+    o.textContent = p.label;
+    o.dataset.offerId = p.id;
+    select.appendChild(o);
+  }
   for (const p of WALL_SIZE_PRESETS) {
     const o = document.createElement('option');
     o.textContent = p.label;
     select.appendChild(o);
   }
+  select.selectedIndex = 1;
 }

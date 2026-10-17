@@ -2,11 +2,15 @@
  * Pure helpers for LED wall dimensions and viewing distance (rule of thumb).
  */
 
-export const PITCH_PRESETS_MM = [1.9, 2.5, 2.9, 3.9, 4.8, 5.9, 6.9];
+export const PITCH_PRESETS_MM = [1.9, 2.5, 2.9, 3.9, 3.91, 4.8, 5.9, 6.9];
 
 export const CABINET_PRESETS = [
   { label: '500 × 500 mm', w: 0.5, h: 0.5 },
   { label: '500 × 1000 mm', w: 0.5, h: 1.0 },
+];
+
+export const OFFER_PRESETS = [
+  { label: 'Angebot Jinyuan P3.91', id: 'jinyuan-p391' },
 ];
 
 export const WALL_SIZE_PRESETS = [

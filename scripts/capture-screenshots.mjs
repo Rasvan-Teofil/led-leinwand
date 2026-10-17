@@ -10,60 +10,58 @@ const launchArgs = [
   '--use-angle=swiftshader-webgl',
 ];
 
-const browser = await chromium.launch({ args: launchArgs });
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-
-page.on('console', (msg) => {
-  if (msg.type() === 'error') console.error('browser:', msg.text());
-});
-page.on('pageerror', (err) => console.error('pageerror:', err.message));
-
-await page.goto('http://127.0.0.1:8080/', { waitUntil: 'networkidle' });
-await page.waitForFunction(() => window.__ledApp?.walls?.length > 0);
-
-async function saveCanvasShot(filename, setupFn) {
-  await page.evaluate((fnBody) => {
+async function capture(filename, setupFn) {
+  const browser = await chromium.launch({ args: launchArgs });
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  page.on('pageerror', (err) => console.error(err.message));
+  await page.goto('http://127.0.0.1:8080/', { waitUntil: 'networkidle' });
+  await page.waitForFunction(
+    () => window.__ledApp?.walls?.length > 0 && window.__ledApp?.roomGroup?.userData?.chairMesh
+  );
+  await page.evaluate(setupFn);
+  const dataUrl = await page.evaluate(() => {
     const app = window.__ledApp;
-    // eslint-disable-next-line no-eval
-    eval(fnBody)(app);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 18; i++) {
       app.orbit.update();
+      app._updateWallFlatBlend();
       app.renderer.render(app.scene, app.camera);
     }
-  }, setupFn);
-  const dataUrl = await page.evaluate(() => window.__ledApp.canvas.toDataURL('image/png'));
-  const buf = Buffer.from(dataUrl.split(',')[1], 'base64');
-  await writeFile(`${outDir}/${filename}`, buf);
+    return app.canvas.toDataURL('image/png');
+  });
+  await writeFile(`${outDir}/${filename}`, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  await browser.close();
 }
 
-const overviewSetup = `((app) => {
+await capture('01-overview.png', () => {
+  const app = window.__ledApp;
+  app.walls.forEach((w) => w.setFlatBlend(1));
   const L = app.layout;
-  app.camera.position.set(1.5, 4.2, 5.5);
-  app.orbit.target.set(L.wallX + 3, 2, 0);
-})`;
+  const px = L.ledPlaneX ?? L.wallX;
+  app.camera.position.set(3.5, 5.2, 5);
+  app.orbit.target.set(px + 2, 1.4, 0);
+});
 
-const closeupSetup = `((app) => {
+await capture('03-pixel-closeup.png', () => {
+  const app = window.__ledApp;
+  app.walls.forEach((w) => w.setFlatBlend(0));
   const L = app.layout;
+  const px = L.ledPlaneX ?? L.wallX;
   const w = app.getSelectedWall();
   const cy = w.config.mountHeightM + w.config.heightM / 2;
-  app.camera.fov = 38;
+  app.camera.fov = 28;
   app.camera.updateProjectionMatrix();
-  app.camera.position.set(-2.2, 2.05, 0.15);
-  app.orbit.target.set(L.wallX + 0.2, cy, 0);
-})`;
+  app.camera.position.set(px + 1.6, 2.0, 0);
+  app.orbit.target.set(px + 0.05, cy, 0);
+});
 
-const compareSetup = `((app) => {
+await capture('04-pitch-comparison.png', () => {
+  const app = window.__ledApp;
   app.setCompareMode(true);
+  app.walls.forEach((w) => w.setFlatBlend(1));
   const L = app.layout;
-  app.camera.fov = 55;
-  app.camera.updateProjectionMatrix();
-  app.camera.position.set(1.5, 4.2, 5.5);
-  app.orbit.target.set(L.wallX + 3, 2, 0);
-})`;
+  const px = L.ledPlaneX ?? L.wallX;
+  app.camera.position.set(px + 7.5, 2.5, 0.15);
+  app.orbit.target.set(px + 0.3, 2.5, 0);
+});
 
-await saveCanvasShot('01-overview.png', overviewSetup);
-await saveCanvasShot('03-pixel-closeup.png', closeupSetup);
-await saveCanvasShot('04-pitch-comparison.png', compareSetup);
-
-await browser.close();
 console.log('Screenshots saved to', outDir);

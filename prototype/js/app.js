@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 import { PointerLockControls } from '../vendor/three/PointerLockControls.js';
 import {
+  attachAudienceChairs,
   buildRoom,
   defaultRoomDims,
+  ensureChairTemplate,
   resolveRoomLayout,
 } from './room.js';
 import { LedWallMesh, createWallConfig } from './led-wall.js';
@@ -12,6 +14,12 @@ import {
   aspectRatioString,
   formatM,
 } from './calculations.js';
+import {
+  JINYUAN_OFFER_ID,
+  JINYUAN_QUOTE,
+  jinyuanOfferStats,
+  jinyuanWallConfig,
+} from './jinyuan-offer.js';
 
 export class LedVisualizerApp {
   constructor(canvas) {
@@ -58,19 +66,13 @@ export class LedVisualizerApp {
 
     this._setupLights();
     this.roomGroup = null;
+    this.chairTemplatePromise = ensureChairTemplate();
     this.rebuildRoom();
 
     const w1 = createWallConfig({
-      label: 'Bühnen-LED',
-      widthM: 4,
-      heightM: 2.5,
-      pitchMm: 3.9,
-      cols: 8,
-      rows: 5,
-      cabinetWM: 0.5,
-      cabinetHM: 0.5,
-      mountHeightM: this.layout.ledWall.defaultMountHeightM,
-      offsetXM: 0,
+      ...jinyuanWallConfig({
+        mountHeightM: this.layout.ledWall.defaultMountHeightM,
+      }),
     });
     this.addWall(w1);
     this.selectedWallId = w1.id;
@@ -88,7 +90,8 @@ export class LedVisualizerApp {
 
   _syncOrbitTarget() {
     const L = this.layout;
-    this.orbit.target.set(L.wallX + 2, 2.2, 0);
+    const x = L.ledPlaneX ?? L.wallX;
+    this.orbit.target.set(x + 2, 2.2, 0);
   }
 
   _applyLedWallTransform(wall) {
@@ -127,6 +130,9 @@ export class LedVisualizerApp {
     for (const w of this.walls) {
       this._applyLedWallTransform(w);
     }
+    this.chairTemplatePromise.then((tpl) =>
+      attachAudienceChairs(this.roomGroup, tpl)
+    );
   }
 
   setRoomDims(dims) {
@@ -241,14 +247,14 @@ export class LedVisualizerApp {
   }
 
   getViewDistanceM() {
-    const wallX = this.layout.wallX;
-    return Math.max(0.5, this.camera.position.x - wallX);
+    const planeX = this.layout.ledPlaneX ?? this.layout.wallX;
+    return Math.max(0.5, this.camera.position.x - planeX);
   }
 
   setViewDistanceM(dist) {
-    const wallX = this.layout.wallX;
+    const planeX = this.layout.ledPlaneX ?? this.layout.wallX;
     const z = this.camera.position.z;
-    this.camera.position.set(wallX + dist, 1.65, z);
+    this.camera.position.set(planeX + dist, 1.65, z);
     this._syncOrbitTarget();
     this.orbit.update();
   }
@@ -320,11 +326,26 @@ export class LedVisualizerApp {
     this.renderer.setSize(w, h, false);
   }
 
+  _updateWallFlatBlend() {
+    const planeX = this.layout.ledPlaneX ?? this.layout.wallX;
+    for (const w of this.walls) {
+      const wp = new THREE.Vector3(
+        planeX + 0.2,
+        w.config.mountHeightM + w.config.heightM / 2,
+        w.group.position.z
+      );
+      const dist = this.camera.position.distanceTo(wp);
+      const blend = THREE.MathUtils.smoothstep(dist, 2.5, 7.5);
+      w.setFlatBlend(blend);
+    }
+  }
+
   _animate() {
     requestAnimationFrame(() => this._animate());
     const delta = 0.016;
     if (!this.fpMode) this.orbit.update();
     else this._updateFp(delta);
+    this._updateWallFlatBlend();
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -338,11 +359,26 @@ export class LedVisualizerApp {
     if (s.clamped.scaled) {
       texNote = `<p class="warn">Hinweis: Textur auf max. ${s.clamped.widthPx}×${s.clamped.heightPx} skaliert (Performance).</p>`;
     }
+    let offerBlock = '';
+    if (s.offerId === JINYUAN_OFFER_ID) {
+      const o = jinyuanOfferStats(s.widthM, s.heightM, s.pitchMm);
+      const q = JINYUAN_QUOTE;
+      offerBlock = `
+        <p><strong>Angebot:</strong> ${q.label} (${q.invoiceNo})</p>
+        <p><strong>Fläche:</strong> ${q.areaM2} m² · Pitch ${q.pitchMm} mm · ${o.cabinetSummary}</p>
+        <p><strong>Cabinet-Raster:</strong> ${o.layoutSummary} · Tiefe ${(q.cabinetDepthM * 1000).toFixed(0)} mm</p>
+        <p><strong>Helligkeit:</strong> ${q.brightnessCdM2} cd/m² · Winkel H${q.viewingAngleH}°/V${q.viewingAngleV}°</p>
+        <p><strong>Leistung:</strong> Ø ${o.powerAvgW} W / max. ${o.powerMaxW} W (${q.powerAvgWm2}/${q.powerMaxWm2} W/m²)</p>
+        <p><strong>Refresh:</strong> ${q.refreshHz} Hz · ${q.processor} (max. ${q.processorMaxPixels.toLocaleString('de-DE')} px) — ${o.cmsOk ? 'OK' : 'über Limit'} (${o.totalPx.toLocaleString('de-DE')} px)</p>
+        <p><strong>Preis:</strong> US$ ${q.priceUsd.toLocaleString('en-US')} ${q.terms}</p>
+      `;
+    }
     return `
       <div class="stats">
+        ${offerBlock}
         <p><strong>Auflösung:</strong> ${s.res.widthPx} × ${s.res.heightPx} px (${s.res.totalPx.toLocaleString('de-DE')} Pixel gesamt)</p>
         <p><strong>Seitenverhältnis:</strong> ${ar}</p>
-        <p><strong>Module:</strong> ${s.cabinets.cols} × ${s.cabinets.rows} = ${s.cabinets.count} Cabinets</p>
+        <p><strong>Module:</strong> ${s.cabinets.cols} Spalten × ${s.cabinets.rows} Reihen (${s.cabinets.count} Cabinets sichtbar)</p>
         <p><strong>Mindestabstand:</strong> ${v.labelMin}</p>
         <p><strong>Komfortabler Abstand:</strong> ${v.labelComfort}</p>
         <p><strong>Ihr Abstand (Kamera):</strong> ${formatM(this.getViewDistanceM())}</p>

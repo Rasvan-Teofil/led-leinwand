@@ -19,6 +19,8 @@ export const ROOM_HEIGHT_M = 5.5;
 export const SEATED_EYE_M = 1.2;
 
 const TRUSS_HALF_M = 0.145;
+/** Turm-Mitten der LED-Traverse vor der Bühnenrückwand / dem Vorhang (keine Kollision). */
+const LED_TRUSS_INSET_FROM_STAGE_BACK_M = 0.35;
 
 export function resolveRoomLayout({ roomHeightM = ROOM_HEIGHT_M } = {}) {
   const footprint = HALL_FOOTPRINT_XZ.map((p) => ({ ...p }));
@@ -48,7 +50,7 @@ export function resolveRoomLayout({ roomHeightM = ROOM_HEIGHT_M } = {}) {
   };
   const curtainX = (backTrussX + TRUSS_HALF_M + stage.xMin) / 2;
 
-  const ledTrussX = stage.xMax - 0.3;
+  const ledTrussX = stage.xMin + LED_TRUSS_INSET_FROM_STAGE_BACK_M;
   const ledPlaneX = ledTrussX + 0.035;
 
   const ceilingTruss = {

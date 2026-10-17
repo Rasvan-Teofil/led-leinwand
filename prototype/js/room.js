@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { resolveRoomLayout } from './room-layout.js';
 import { createChairInstances, preloadChairTemplate } from './chair-instances.js';
+import {
+  addCeilingTruss,
+  addKleingruppenCabinet,
+  addStageDressing,
+  makeRugTexture,
+} from './room-visual.js';
 
 export function buildRoom(uiDims) {
   const layout = resolveRoomLayout({
@@ -13,19 +19,19 @@ export function buildRoom(uiDims) {
   group.userData.layout = layout;
 
   const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x5a5a62,
-    roughness: 0.88,
-    metalness: 0.04,
+    color: 0x6a6a70,
+    roughness: 0.92,
+    metalness: 0.02,
   });
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0xe6e2d8,
-    roughness: 0.92,
+    color: 0x9a9690,
+    roughness: 0.94,
     metalness: 0,
     side: THREE.DoubleSide,
   });
   const ceilMat = new THREE.MeshStandardMaterial({
-    color: 0xf2f0ea,
-    roughness: 0.95,
+    color: 0x0c0c10,
+    roughness: 0.98,
   });
 
   const floor = new THREE.Mesh(
@@ -47,9 +53,12 @@ export function buildRoom(uiDims) {
   addOuterWalls(group, layout, wallMat);
   addBackstage(group, layout);
   addStage(group, layout);
+  addStageDressing(group, layout);
   addTruss(group, layout);
+  addCeilingTruss(group, layout, layout.roomHeightM);
   addRugAndChairs(group, layout);
   addTechDesk(group, layout);
+  addKleingruppenCabinet(group, layout);
 
   return group;
 }
@@ -89,7 +98,7 @@ function addOuterWalls(group, layout, wallMat) {
   right.position.set(halfW, h / 2, 0);
   group.add(right);
 
-  const bumpMat = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.9 });
+  const bumpMat = new THREE.MeshStandardMaterial({ color: 0x8e8a84, roughness: 0.92 });
   const bumpN = new THREE.Mesh(new THREE.BoxGeometry(2.2, h, 1.4), bumpMat);
   bumpN.position.set(halfW - 1.1, h / 2, halfD - 2.2);
   group.add(bumpN);
@@ -156,7 +165,7 @@ function makeLabel(text) {
 
 function addStage(group, layout) {
   const { stage } = layout;
-  const mat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.78 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2a1a12, roughness: 0.82 });
   const depth = stage.xMax - stage.xMin;
   const length = stage.zMax - stage.zMin;
   const h = stage.heightM;
@@ -174,7 +183,7 @@ function addStage(group, layout) {
     const zx = stage.xMin + (depth / 4) * i;
     const line = new THREE.Mesh(
       new THREE.BoxGeometry(0.03, h + 0.002, length),
-      new THREE.MeshStandardMaterial({ color: 0x6d3810 })
+      new THREE.MeshStandardMaterial({ color: 0x1a1008 })
     );
     line.position.set(zx, h / 2, (stage.zMin + stage.zMax) / 2);
     group.add(line);
@@ -184,9 +193,9 @@ function addStage(group, layout) {
 function addTruss(group, layout) {
   const { truss } = layout;
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xe8e8ee,
-    metalness: 0.5,
-    roughness: 0.4,
+    color: 0x6a6a72,
+    metalness: 0.65,
+    roughness: 0.38,
   });
   const t = 0.14;
   const h = truss.heightM;
@@ -214,9 +223,10 @@ function addRugAndChairs(group, layout) {
   const { ledPlaneX, halfW, scale: s } = layout;
   const rugX = ledPlaneX + 11.5 * s;
   const rugZ = 0;
+  const rugTex = makeRugTexture();
   const rug = new THREE.Mesh(
     new THREE.PlaneGeometry(layout.rugSizeX * s, layout.rugSizeZ * s),
-    new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.95 })
+    new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.95 })
   );
   rug.rotation.x = -Math.PI / 2;
   rug.position.set(rugX, 0.02, rugZ);

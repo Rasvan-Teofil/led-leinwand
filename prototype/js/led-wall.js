@@ -51,6 +51,8 @@ void main() {
   vec3 outRgb = mix(dotted, blended, blend);
   float seam = cabinetSeam(vUv);
   outRgb *= mix(0.72, 1.0, seam);
+  outRgb *= 1.0 + blend * 0.55;
+  outRgb += blended * 0.12;
   gl_FragColor = vec4(outRgb, 1.0);
 }
 `;

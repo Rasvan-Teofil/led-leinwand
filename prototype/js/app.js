@@ -42,13 +42,16 @@ export class LedVisualizerApp {
       antialias: true,
       preserveDrawingBuffer: true,
     });
-    this.renderer.setClearColor(0x1a1a22, 1);
+    this.renderer.setClearColor(0x08080c, 1);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1a22);
+    this.scene.background = new THREE.Color(0x08080c);
+    this.scene.fog = new THREE.Fog(0x101018, 18, 42);
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
     this._applyViewPreset('ersteReihe');
@@ -103,15 +106,20 @@ export class LedVisualizerApp {
   }
 
   _setupLights() {
-    const amb = new THREE.AmbientLight(0xffffff, 0.45);
+    const amb = new THREE.AmbientLight(0x8890a0, 0.14);
     this.scene.add(amb);
-    const dir = new THREE.DirectionalLight(0xfff5e8, 0.85);
-    dir.position.set(4, 12, 8);
+    const hemi = new THREE.HemisphereLight(0x404858, 0x08080c, 0.22);
+    this.scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xfff0e0, 0.28);
+    dir.position.set(6, 14, 4);
     dir.castShadow = true;
     this.scene.add(dir);
-    const fill = new THREE.DirectionalLight(0xc8d8ff, 0.25);
-    fill.position.set(-6, 4, -2);
-    this.scene.add(fill);
+    const stageSpot = new THREE.SpotLight(0xffeedd, 0.35, 28, 0.55, 0.4);
+    const L = this.layout;
+    stageSpot.position.set(L.ledPlaneX + 2, L.roomHeightM - 0.5, 0);
+    stageSpot.target.position.set(L.stage.xMin + 1, 1.5, 0);
+    this.scene.add(stageSpot);
+    this.scene.add(stageSpot.target);
   }
 
   rebuildRoom() {

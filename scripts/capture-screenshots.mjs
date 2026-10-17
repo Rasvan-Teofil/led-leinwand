@@ -37,8 +37,22 @@ await capture('01-overview.png', () => {
   app.walls.forEach((w) => w.setFlatBlend(1));
   const L = app.layout;
   const px = L.ledPlaneX ?? L.wallX;
-  app.camera.position.set(3.5, 5.2, 5);
-  app.orbit.target.set(px + 2, 1.4, 0);
+  app.camera.fov = 52;
+  app.camera.updateProjectionMatrix();
+  app.camera.position.set(px + 10.5, 3.2, 5.8);
+  app.orbit.target.set(px + 1.5, 2.0, 0);
+});
+
+await capture('02-first-row.png', () => {
+  const app = window.__ledApp;
+  app.walls.forEach((w) => w.setFlatBlend(1));
+  const L = app.layout;
+  const px = L.ledPlaneX ?? L.wallX;
+  const v = L.viewpoints.ersteReihe;
+  app.camera.fov = 48;
+  app.camera.updateProjectionMatrix();
+  app.camera.position.set(v.x, 1.65, v.z);
+  app.orbit.target.set(px + 0.2, 2.6, 0);
 });
 
 await capture('03-pixel-closeup.png', () => {

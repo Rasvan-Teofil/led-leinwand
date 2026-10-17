@@ -29,7 +29,12 @@ export class LedVisualizerApp {
     this.pitchToggle = false;
     this.altPitchMm = 1.9;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+    this.renderer.setClearColor(0x1a1a22, 1);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -58,10 +63,12 @@ export class LedVisualizerApp {
     const w1 = createWallConfig({
       label: 'Bühnen-LED',
       widthM: 4,
-      heightM: 2.25,
+      heightM: 2.5,
       pitchMm: 3.9,
       cols: 8,
       rows: 5,
+      cabinetWM: 0.5,
+      cabinetHM: 0.5,
       mountHeightM: this.layout.ledWall.defaultMountHeightM,
       offsetXM: 0,
     });

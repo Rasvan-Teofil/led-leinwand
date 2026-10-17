@@ -52,5 +52,19 @@ class CalculationsTest(unittest.TestCase):
         self.assertEqual(cols * rows, 40)
 
 
+def snap_mismatch(cols, rows, cab_w, cab_h, target_w, target_h):
+    width_m = cols * cab_w
+    height_m = rows * cab_h
+    return abs(target_w - width_m) > 0.001 or abs(target_h - height_m) > 0.001
+
+
+class SnapGridTest(unittest.TestCase):
+    def test_8x5_snaps_4x2_5(self):
+        self.assertFalse(snap_mismatch(8, 5, 0.5, 0.5, 4.0, 2.5))
+
+    def test_8x5_mismatch_2_25_height(self):
+        self.assertTrue(snap_mismatch(8, 5, 0.5, 0.5, 4.0, 2.25))
+
+
 if __name__ == "__main__":
     unittest.main()

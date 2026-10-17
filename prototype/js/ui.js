@@ -2,6 +2,8 @@ import {
   PITCH_PRESETS_MM,
   CABINET_PRESETS,
   WALL_SIZE_PRESETS,
+  gridFromWallAndCabinet,
+  snapWallToCabinetGrid,
 } from './calculations.js';
 import { createWallConfig } from './led-wall.js';
 
@@ -26,6 +28,7 @@ export function bindUi(app, root) {
     compareMode: root.querySelector('#compare-mode'),
     pitchToggle: root.querySelector('#pitch-toggle'),
     altPitch: root.querySelector('#alt-pitch'),
+    gridHint: root.querySelector('#grid-size-hint'),
     stats: root.querySelector('#stats-panel'),
     viewDistance: root.querySelector('#view-distance'),
     viewDistanceLabel: root.querySelector('#view-distance-label'),
@@ -77,11 +80,15 @@ export function bindUi(app, root) {
   });
 
   els.wallPreset.addEventListener('change', () => {
-    const p = WALL_SIZE_PRESETS[els.wallPreset.selectedIndex];
+    const idx = els.wallPreset.selectedIndex - 1;
+    if (idx < 0) return;
+    const p = WALL_SIZE_PRESETS[idx];
     if (!p) return;
-    els.wallWidth.value = p.w;
-    els.wallHeight.value = p.h;
-    applyWallSize();
+    const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
+    const grid = gridFromWallAndCabinet(p.w, p.h, cab.w, cab.h);
+    els.cols.value = grid.cols;
+    els.rows.value = grid.rows;
+    applyGrid(p.w, p.h);
   });
 
   const applyWallSize = () => {
@@ -92,30 +99,37 @@ export function bindUi(app, root) {
     const rows = Math.max(1, Math.round(h / cab.h));
     els.cols.value = cols;
     els.rows.value = rows;
-    app.updateSelectedWall({
-      widthM: cols * cab.w,
-      heightM: rows * cab.h,
-      cols,
-      rows,
-      cabinetWM: cab.w,
-      cabinetHM: cab.h,
-    });
-    refresh();
+    applyGrid(w, h);
   };
 
   els.wallWidth.addEventListener('change', applyWallSize);
   els.wallHeight.addEventListener('change', applyWallSize);
-  els.cols.addEventListener('change', applyGrid);
-  els.rows.addEventListener('change', applyGrid);
-  els.cabinetPreset.addEventListener('change', applyGrid);
+  els.cols.addEventListener('change', () => applyGrid());
+  els.rows.addEventListener('change', () => applyGrid());
+  els.cabinetPreset.addEventListener('change', () => applyGrid());
 
-  function applyGrid() {
+  function applyGrid(targetW, targetH) {
     const cab = CABINET_PRESETS[els.cabinetPreset.selectedIndex] ?? CABINET_PRESETS[0];
     const cols = parseInt(els.cols.value, 10);
     const rows = parseInt(els.rows.value, 10);
-    app.applyGridFromInputs(cols, rows, cab.w, cab.h);
-    els.wallWidth.value = cols * cab.w;
-    els.wallHeight.value = rows * cab.h;
+    const snap = snapWallToCabinetGrid(
+      cols,
+      rows,
+      cab.w,
+      cab.h,
+      targetW ?? parseFloat(els.wallWidth.value),
+      targetH ?? parseFloat(els.wallHeight.value)
+    );
+    app.applyGridFromInputs(snap.cols, snap.rows, cab.w, cab.h);
+    els.wallWidth.value = snap.widthM;
+    els.wallHeight.value = snap.heightM;
+    if (els.gridHint) {
+      els.gridHint.textContent = `Effektive Wandgröße: ${snap.effectiveLabel}`;
+      els.gridHint.classList.toggle('warn', snap.mismatch);
+      if (snap.mismatch && targetW != null) {
+        els.gridHint.textContent += ` — Soll ${targetW}×${targetH} m weicht vom Raster ab.`;
+      }
+    }
     refresh();
   }
 
@@ -233,7 +247,9 @@ export function bindUi(app, root) {
     syncDistanceSlider();
   }
 
-  refresh();
+  refreshWallSelect();
+  syncWallFields();
+  applyGrid();
 }
 
 function fillPitchPresets(select) {

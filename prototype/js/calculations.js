@@ -66,6 +66,31 @@ export function gridFromWallAndCabinet(wallWM, wallHM, cabWM, cabHM) {
   };
 }
 
+/** Cabinet-Raster ist maßgeblich; optionale Soll-Maße nur zum Abgleich. */
+export function snapWallToCabinetGrid(cols, rows, cabWM, cabHM, targetWM, targetHM) {
+  const widthM = cols * cabWM;
+  const heightM = rows * cabHM;
+  const tol = 0.001;
+  const mismatch =
+    targetWM != null &&
+    targetHM != null &&
+    (Math.abs(targetWM - widthM) > tol || Math.abs(targetHM - heightM) > tol);
+  return {
+    cols,
+    rows,
+    widthM,
+    heightM,
+    cabinetWM: cabWM,
+    cabinetHM: cabHM,
+    mismatch,
+    effectiveLabel: `${formatMetersDe(widthM)} × ${formatMetersDe(heightM)} m (${cols}×${rows} Cabinets)`,
+  };
+}
+
+export function formatMetersDe(m) {
+  return Number.isInteger(m) ? String(m) : m.toFixed(2).replace('.', ',');
+}
+
 /** Rule of thumb: ~1 m minimum per mm pitch; comfortable ~2–3×. */
 export function viewingDistanceRuleOfThumb(pitchMm) {
   const minM = pitchMm; // z. B. 3,9 mm Pitch → ca. 3,9 m Mindestabstand

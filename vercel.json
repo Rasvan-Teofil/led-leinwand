@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "name": "led-leinwand",
+  "builds": [
+    {
+      "src": "prototype/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/prototype/$1" }
+  ]
+}

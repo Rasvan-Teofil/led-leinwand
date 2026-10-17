@@ -75,9 +75,10 @@ export function addStageDressing(group, layout) {
   const curtainTop = stageTruss.centerY - TRUSS_SECTION_M / 2 - 0.05;
   group.add(buildCurtain(stage.lengthZ - 0.1, curtainTop, layout.curtainX, cz));
 
-  addLedDotCross(group, stage.xMax - 0.75, stage.heightM, stage.zMax - 0.75);
-  addDrumKit(group, stage.xMin + 1.0, stage.heightM, cz + 2.3);
-  addKeyboard(group, stage.xMax - 1.1, stage.heightM, cz - 3.0);
+  // Requisiten vor der LED-Wand (Bühnenmitte), nicht hinter dem Vorhang.
+  addLedDotCross(group, stage.xMin + 2.0, stage.heightM, cz + 1.6);
+  addDrumKit(group, stage.xMin + 1.55, stage.heightM, cz + 2.4);
+  addKeyboard(group, stage.xMin + 1.85, stage.heightM, cz - 2.2);
 }
 
 /** Bühnenvorhang mit Falten; Fläche zeigt zum Publikum (+X). */

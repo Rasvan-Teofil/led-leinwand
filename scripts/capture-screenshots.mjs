@@ -125,8 +125,14 @@ async function canvasRect() {
 
 const report = {};
 
+const ledAim = await page.evaluate(() => {
+  const app = window.__ledApp;
+  const t = app.getLedTarget(new window.__ledTHREE.Vector3());
+  return [t.x, t.y, t.z];
+});
+
 // 1) Hinten im Saal stehend, Blick zur Bühne (wie Foto 3).
-await freeCamera({ pos: [12.2, 1.65, 1.4], target: [-0.6, 1.9, -0.6], fov: 62 });
+await freeCamera({ pos: [12.2, 1.65, 1.4], target: ledAim, fov: 62 });
 report['back of room (standing)'] = await visibilityReport();
 await shoot('01-back-of-room.png');
 
@@ -149,7 +155,7 @@ report.Draufsicht = await visibilityReport();
 await shoot('04-draufsicht.png');
 
 // 7) Publikum → Bühne wie Foto 2 (stehend, leicht seitlich).
-await freeCamera({ pos: [4.4, 1.62, -1.9], target: [-0.6, 2.1, 0.5], fov: 60 });
+await freeCamera({ pos: [4.4, 1.62, -1.9], target: ledAim, fov: 60 });
 report['audience like photo 2'] = await visibilityReport();
 await shoot('07-publikum-wie-foto2.png');
 

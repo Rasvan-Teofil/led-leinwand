@@ -100,6 +100,16 @@ describe('seating blocks from the floor plan', () => {
   });
 });
 
+describe('LED wall placement', () => {
+  it('hangs at the stage back with ~2.5 m clear depth to the front edge', () => {
+    const { stage, ledWall, ledPlaneX } = L;
+    assert.ok(ledWall.trussX > stage.xMin + 0.28 && ledWall.trussX < stage.xMin + 0.42);
+    assert.ok(ledPlaneX > ledWall.trussX);
+    const clearDepth = stage.xMax - ledPlaneX;
+    assert.ok(clearDepth > 2.45 && clearDepth < 2.75, `clear stage depth ${clearDepth}`);
+  });
+});
+
 describe('camera presets', () => {
   it('stand inside the hall, in the audience, facing the stage', () => {
     for (const [key, vp] of Object.entries(L.viewpoints)) {

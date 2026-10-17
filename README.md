@@ -1,6 +1,6 @@
 # LED-Leinwand Visualisierung
 
-Browserbasiertes 3D-Tool zum Vergleichen von LED-Wänden (Größe, Pixelpitch, Betrachtungsabstand) im Gottesdienstraum. Der Saal ist nach dem Lageplan modelliert; die LED-Wand hängt an einer Alu-Traverse an der Bühnenvorderkante.
+Browserbasiertes 3D-Tool zum Vergleichen von LED-Wänden (Größe, Pixelpitch, Betrachtungsabstand) im Gottesdienstraum. Der Saal ist nach dem Lageplan modelliert; die LED-Wand hängt an einer Alu-Traverse an der Bühnenrückseite (vor dem Vorhang).
 
 ## Funktionen
 

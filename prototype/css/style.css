@@ -136,11 +136,16 @@ button:disabled {
 
 .view-bar button {
   flex: 0 1 auto;
+  background: rgba(44, 44, 58, 0.9);
 }
 
 .view-bar button.secondary {
   width: auto;
   margin-top: 0;
+}
+
+.view-bar button.active {
+  background: #4a6cf7;
 }
 
 .distance-control {

@@ -39,6 +39,7 @@ export function bindUi(app, panelRoot, viewportRoot) {
     presetMid: viewportRoot.querySelector('#view-mid'),
     presetBack: viewportRoot.querySelector('#view-back'),
     presetTech: viewportRoot.querySelector('#view-tech'),
+    planView: viewportRoot.querySelector('#view-plan'),
     fpMode: viewportRoot.querySelector('#fp-mode'),
   };
 
@@ -166,7 +167,7 @@ export function bindUi(app, panelRoot, viewportRoot) {
   els.mountHeight.addEventListener('change', () => {
     const w = app.getSelectedWall();
     const h = parseFloat(els.mountHeight.value);
-    if (w) w.setMountHeight(h);
+    if (w && !Number.isNaN(h)) els.mountHeight.value = app.setMountHeight(w, h);
   });
 
   els.contentType.addEventListener('change', () => {
@@ -189,40 +190,53 @@ export function bindUi(app, panelRoot, viewportRoot) {
     refreshStats();
   });
 
-  els.viewDistance.max = app.roomDims.hallWidthM - 2;
+  els.viewDistance.min = 1;
+  els.viewDistance.max = app.getMaxViewDistanceM().toFixed(1);
   els.viewDistance.value = app.getViewDistanceM();
   els.viewDistance.addEventListener('input', () => {
     const d = parseFloat(els.viewDistance.value);
     app.setViewDistanceM(d);
     els.viewDistanceLabel.textContent = `${d.toFixed(1)} m`;
+    markActiveView(null);
   });
 
-  els.presetFirst.addEventListener('click', () => {
-    app.setViewPreset('first');
-    syncDistanceSlider();
-  });
-  els.presetMid.addEventListener('click', () => {
-    app.setViewPreset('mid');
-    syncDistanceSlider();
-  });
-  els.presetBack.addEventListener('click', () => {
-    app.setViewPreset('back');
-    syncDistanceSlider();
-  });
-  els.presetTech.addEventListener('click', () => {
-    app.setViewPreset('tech');
-    syncDistanceSlider();
+  const presetButtons = [
+    [els.presetFirst, 'first'],
+    [els.presetMid, 'mid'],
+    [els.presetBack, 'back'],
+    [els.presetTech, 'tech'],
+  ];
+  for (const [btn, preset] of presetButtons) {
+    btn.addEventListener('click', () => {
+      app.setViewPreset(preset);
+      syncDistanceSlider();
+      markActiveView(btn);
+    });
+  }
+
+  els.planView.addEventListener('click', () => {
+    app.setPlanView(true);
+    markActiveView(els.planView);
   });
 
   els.fpMode.addEventListener('click', () => {
     app.enableFirstPerson(true);
+    markActiveView(els.fpMode);
   });
+
+  function markActiveView(active) {
+    for (const btn of [...presetButtons.map(([b]) => b), els.planView, els.fpMode]) {
+      btn.classList.toggle('active', btn === active);
+    }
+  }
+  markActiveView(els.presetFirst);
 
   function syncDistanceSlider() {
     const d = app.getViewDistanceM();
     els.viewDistance.value = d;
     els.viewDistanceLabel.textContent = `${d.toFixed(1)} m`;
   }
+  app.orbit.addEventListener('change', syncDistanceSlider);
 
   function syncWallFields() {
     const w = app.getSelectedWall();
@@ -273,6 +287,7 @@ export function bindUi(app, panelRoot, viewportRoot) {
   } else {
     applyGrid();
   }
+  syncDistanceSlider();
 }
 
 function fillPitchPresets(select) {

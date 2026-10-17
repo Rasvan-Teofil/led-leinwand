@@ -67,11 +67,17 @@ export function createWallConfig(overrides = {}) {
   };
 }
 
+/**
+ * LED-Wand mit Traversen-Torbogen. Lokales System der Gruppe: Ursprung auf dem Boden in der
+ * Traversenachse, x entlang der Wandbreite, +z = Blickrichtung der LED-Fläche.
+ */
 export class LedWallMesh {
   constructor(config, scene) {
-    this.config = { ...config };
+    this.config = { trussBaseY: 0, ...config };
     this.scene = scene;
     this.group = new THREE.Group();
+    this.panel = new THREE.Group();
+    this.group.add(this.panel);
     this.texture = null;
     this.material = null;
     this.mesh = null;
@@ -115,17 +121,44 @@ export class LedWallMesh {
 
     const geo = new THREE.PlaneGeometry(widthM, heightM);
     this.mesh = new THREE.Mesh(geo, this.material);
-    this.mesh.position.set(0, heightM / 2, 0);
+    this.mesh.position.set(0, heightM / 2, cabinetDepthM / 2 + 0.002);
     this.mesh.renderOrder = 3;
-    this.group.add(this.mesh);
+    this.mesh.name = 'led-surface';
+    this.panel.add(this.mesh);
 
     this.cabinetGroup = this._buildCabinetBoxes(widthM, columnStack, cabinetDepthM);
-    this.group.add(this.cabinetGroup);
-
-    this.trussGroup = buildHangingTruss(widthM, heightM, 0);
-    this.group.add(this.trussGroup);
+    this.panel.add(this.cabinetGroup);
 
     this._applyTransform();
+    this._rebuildTruss();
+  }
+
+  _rebuildTruss() {
+    this._disposeTruss();
+    const { widthM, heightM, mountHeightM, trussBaseY } = this.config;
+    this.trussGroup = buildHangingTruss({
+      widthM,
+      panelBottomY: mountHeightM,
+      panelHeightM: heightM,
+      baseY: trussBaseY,
+    });
+    this.group.add(this.trussGroup);
+  }
+
+  _disposeTruss() {
+    if (!this.trussGroup) return;
+    this.group.remove(this.trussGroup);
+    const geos = new Set();
+    const mats = new Set();
+    this.trussGroup.traverse((o) => {
+      if (o.isMesh) {
+        geos.add(o.geometry);
+        mats.add(o.material);
+      }
+    });
+    geos.forEach((g) => g.dispose());
+    mats.forEach((m) => m.dispose());
+    this.trussGroup = null;
   }
 
   _buildCabinetBoxes(widthM, columnStack, depthM) {
@@ -145,7 +178,7 @@ export class LedWallMesh {
           new THREE.BoxGeometry(colW - 0.004, cell.h - 0.004, depthM),
           mat
         );
-        box.position.set(x, y + cell.h / 2, -depthM / 2 - 0.01);
+        box.position.set(x, y + cell.h / 2, 0);
         g.add(box);
       }
       y += cell.h;
@@ -155,11 +188,11 @@ export class LedWallMesh {
 
   _disposeParts() {
     if (this.mesh) {
-      this.group.remove(this.mesh);
+      this.panel.remove(this.mesh);
       this.mesh.geometry.dispose();
     }
     if (this.cabinetGroup) {
-      this.group.remove(this.cabinetGroup);
+      this.panel.remove(this.cabinetGroup);
       this.cabinetGroup.traverse((o) => {
         if (o.isMesh) {
           o.geometry.dispose();
@@ -167,22 +200,15 @@ export class LedWallMesh {
         }
       });
     }
-    if (this.trussGroup) {
-      this.group.remove(this.trussGroup);
-      this.trussGroup.traverse((o) => {
-        if (o.isMesh) {
-          o.geometry.dispose();
-          o.material.dispose();
-        }
-      });
-    }
+    this._disposeTruss();
     if (this.material) this.material.dispose();
     if (this.texture) this.texture.dispose();
   }
 
   _applyTransform() {
     const { mountHeightM, offsetXM } = this.config;
-    this.group.position.set(this.group.position.x, mountHeightM, offsetXM);
+    this.panel.position.y = mountHeightM;
+    this.group.position.z = offsetXM;
   }
 
   setOffsetXM(alongWallZ) {
@@ -192,7 +218,20 @@ export class LedWallMesh {
 
   setMountHeight(m) {
     this.config.mountHeightM = m;
-    this.group.position.y = m;
+    this.panel.position.y = m;
+    this._rebuildTruss();
+  }
+
+  setTrussBaseY(y) {
+    if (this.config.trussBaseY === y) return;
+    this.config.trussBaseY = y;
+    this._rebuildTruss();
+  }
+
+  /** LED-Mittelpunkt in Weltkoordinaten. */
+  getCenterWorld(target = new THREE.Vector3()) {
+    this.mesh.updateWorldMatrix(true, false);
+    return this.mesh.getWorldPosition(target);
   }
 
   updateConfig(partial) {

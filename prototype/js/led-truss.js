@@ -1,47 +1,64 @@
 import * as THREE from 'three';
-import { BoxTrussBuilder, TRUSS_SECTION_M } from './box-truss.js';
+import {
+  BoxTrussBuilder,
+  TRUSS_CHORD_OFFSET_M,
+  TRUSS_CHORD_R,
+  TRUSS_SECTION_M,
+} from './box-truss.js';
+
+const FLYBAR_H = 0.05;
+const SLING_LEN = 0.26;
+const TOWER_CLEARANCE_M = 0.25;
+
+/** Höhe der Traversenachse über dem Boden für eine LED-Oberkante bei panelTopY. */
+export function lintelCenterY(panelTopY) {
+  return panelTopY + FLYBAR_H + SLING_LEN + TRUSS_CHORD_OFFSET_M + TRUSS_CHORD_R;
+}
+
+export function trussTopForPanelTop(panelTopY) {
+  return lintelCenterY(panelTopY) + TRUSS_SECTION_M / 2;
+}
 
 /**
- * Hängende F34-Boxtruss parallel zur LED-Wand (Lintell entlang lokaler X).
+ * Torbogen aus F34-Traverse (zwei Türme + Querträger) im lokalen System der LED-Wand:
+ * x entlang der Wandbreite, y = Höhe über Boden, z = 0 Traversenachse (Cabinet-Mitte).
+ * Die Cabinets hängen über eine Flugschiene und Stahlseile an den unteren Gurtrohren.
  */
-export function buildHangingTruss(widthM, heightM, mountBottomM = 0) {
+export function buildHangingTruss({ widthM, panelBottomY, panelHeightM, baseY }) {
   const group = new THREE.Group();
-  const wallTopY = mountBottomM + heightM;
-  const lintelY = wallTopY + 0.45;
-  const halfSpanX = widthM / 2 + 0.32;
-  const builder = new BoxTrussBuilder();
+  group.name = 'led-hanging-truss';
+  const h = TRUSS_SECTION_M / 2;
+  const o = TRUSS_CHORD_OFFSET_M;
+  const panelTop = panelBottomY + panelHeightM;
+  const lintelY = lintelCenterY(panelTop);
+  const halfSpan = widthM / 2 + TOWER_CLEARANCE_M;
 
-  builder.addRun([-halfSpanX, mountBottomM, 0], [-halfSpanX, lintelY, 0], {
-    basePlate: true,
-    basePlateAtStart: true,
-  });
-  builder.addRun([halfSpanX, mountBottomM, 0], [halfSpanX, lintelY, 0], {
-    basePlate: true,
-    basePlateAtStart: true,
-  });
-  builder.addRun([-halfSpanX - 0.02, lintelY, 0], [halfSpanX + 0.02, lintelY, 0]);
+  const b = new BoxTrussBuilder();
+  b.addTower(-halfSpan, 0, baseY, lintelY);
+  b.addTower(halfSpan, 0, baseY, lintelY);
+  b.addRun([-halfSpan + h, lintelY, 0], [halfSpan - h, lintelY, 0]);
+  group.add(b.toGroup());
 
-  group.add(builder.toGroup());
+  const blackMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.6, roughness: 0.35 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x8c9098, metalness: 0.7, roughness: 0.3 });
 
-  const hangMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, metalness: 0.85, roughness: 0.25 });
-  const clampMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, metalness: 0.9, roughness: 0.2 });
-  const chainZ = TRUSS_SECTION_M * 0.45;
-  const chainCount = 7;
-  for (let i = 0; i < chainCount; i++) {
-    const t = chainCount === 1 ? 0.5 : i / (chainCount - 1);
-    const x = -widthM / 2 + widthM * t;
-    const chainLen = Math.max(0.12, lintelY - wallTopY - 0.08);
-    const chain = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, chainLen, 8),
-      hangMat
-    );
-    chain.position.set(x, wallTopY + chainLen / 2 + 0.04, chainZ);
-    group.add(chain);
+  const flybar = new THREE.Mesh(new THREE.BoxGeometry(widthM, FLYBAR_H, 0.06), blackMat);
+  flybar.position.set(0, panelTop + FLYBAR_H / 2, 0);
+  group.add(flybar);
 
-    const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.06), clampMat);
-    clamp.position.set(x, wallTopY + 0.02, chainZ);
-    group.add(clamp);
+  const slingBottom = panelTop + FLYBAR_H;
+  const chordBottom = lintelY - o - TRUSS_CHORD_R;
+  const slingCount = Math.max(2, Math.round(widthM));
+  const slingGeo = new THREE.CylinderGeometry(0.005, 0.005, chordBottom - slingBottom, 6);
+  const adapterGeo = new THREE.BoxGeometry(0.05, 0.025, 2 * o + 0.08);
+  for (let i = 0; i < slingCount; i++) {
+    const x = -widthM / 2 + (widthM * (i + 0.5)) / slingCount;
+    const sling = new THREE.Mesh(slingGeo, steelMat);
+    sling.position.set(x, (slingBottom + chordBottom) / 2, 0);
+    group.add(sling);
+    const adapter = new THREE.Mesh(adapterGeo, blackMat);
+    adapter.position.set(x, chordBottom - 0.0125, 0);
+    group.add(adapter);
   }
-
   return group;
 }

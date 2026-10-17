@@ -21,7 +21,13 @@ uniform float uLedFill;
 varying vec2 vUv;
 
 void main() {
+  vec3 blended = texture2D(uMap, vUv).rgb;
   vec2 pix = vUv * uResolution;
+  float ledSpan = max(length(dFdx(pix)), length(dFdy(pix)));
+  if (ledSpan > 0.9) {
+    gl_FragColor = vec4(blended, 1.0);
+    return;
+  }
   vec2 cell = fract(pix);
   vec2 idx = floor(pix);
   vec2 sampleUv = (idx + 0.5) / uResolution;
@@ -29,8 +35,9 @@ void main() {
   vec2 centered = cell - 0.5;
   float d = max(abs(centered.x), abs(centered.y));
   float mask = step(d, uLedFill * 0.5);
-  vec3 outColor = mix(uGapColor, color, mask);
-  gl_FragColor = vec4(outColor, 1.0);
+  vec3 dotted = mix(uGapColor, color, mask);
+  float mixFar = smoothstep(0.55, 1.0, ledSpan);
+  gl_FragColor = vec4(mix(dotted, blended, mixFar), 1.0);
 }
 `;
 
@@ -88,8 +95,9 @@ export class LedWallMesh {
         : createLyricsCanvas(clamped.widthPx, clamped.heightPx);
 
     this.texture = new THREE.CanvasTexture(canvas);
-    this.texture.minFilter = THREE.NearestFilter;
-    this.texture.magFilter = THREE.NearestFilter;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.texture.magFilter = THREE.LinearFilter;
+    this.texture.generateMipmaps = false;
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.needsUpdate = true;
 
@@ -104,11 +112,13 @@ export class LedWallMesh {
       },
       vertexShader: LED_VERTEX,
       fragmentShader: LED_FRAGMENT,
+      extensions: { derivatives: true },
     });
 
     const geo = new THREE.PlaneGeometry(widthM, heightM);
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.position.set(0, heightM / 2, 0);
+    this.mesh.renderOrder = 2;
     this.group.add(this.mesh);
 
     const frameMat = new THREE.MeshStandardMaterial({

@@ -92,7 +92,7 @@ function wallPlane(w, h, mat) {
 
 function addStage(group, layout) {
   const { stage } = layout;
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.75 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9a5c28, roughness: 0.72 });
   const depth = stage.xMax - stage.xMin;
   const length = stage.zMax - stage.zMin;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.35, length), mat);

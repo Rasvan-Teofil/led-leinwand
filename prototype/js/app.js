@@ -215,12 +215,15 @@ export class LedVisualizerApp {
   _layoutWalls() {
     if (this.walls.length === 0) return;
     if (this.compareMode && this.walls.length >= 2) {
-      const gap = 0.35;
+      const gap = 0.5;
+      const sorted = [...this.walls].sort((a, b) =>
+        a.config.id.localeCompare(b.config.id)
+      );
       let totalZ = 0;
-      for (const w of this.walls) totalZ += w.config.widthM;
-      totalZ += gap * (this.walls.length - 1);
+      for (const w of sorted) totalZ += w.config.widthM;
+      totalZ += gap * (sorted.length - 1);
       let z = -totalZ / 2;
-      for (const w of this.walls) {
+      for (const w of sorted) {
         w.setOffsetXM(z + w.config.widthM / 2);
         z += w.config.widthM + gap;
       }

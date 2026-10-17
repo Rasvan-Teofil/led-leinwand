@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { LedVisualizerApp } from './app.js';
 import { bindUi } from './ui.js';
 import { ensureChairTemplate } from './room.js';
@@ -12,6 +13,7 @@ async function start() {
     const app = new LedVisualizerApp(canvas);
     bindUi(app, panel, viewport);
     window.__ledApp = app;
+    window.__ledTHREE = THREE;
   } catch (err) {
     console.error('LED-Visualizer Startfehler:', err);
     const banner = document.createElement('p');

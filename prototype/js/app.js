@@ -44,14 +44,14 @@ export class LedVisualizerApp {
     });
     this.renderer.setClearColor(0x08080c, 1);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x08080c);
-    this.scene.fog = new THREE.Fog(0x101018, 18, 42);
+    this.scene.fog = new THREE.Fog(0x1a1a22, 32, 58);
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
     this._applyViewPreset('ersteReihe');
@@ -106,20 +106,45 @@ export class LedVisualizerApp {
   }
 
   _setupLights() {
-    const amb = new THREE.AmbientLight(0x8890a0, 0.14);
-    this.scene.add(amb);
-    const hemi = new THREE.HemisphereLight(0x404858, 0x08080c, 0.22);
-    this.scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xfff0e0, 0.28);
-    dir.position.set(6, 14, 4);
-    dir.castShadow = true;
-    this.scene.add(dir);
-    const stageSpot = new THREE.SpotLight(0xffeedd, 0.35, 28, 0.55, 0.4);
     const L = this.layout;
-    stageSpot.position.set(L.ledPlaneX + 2, L.roomHeightM - 0.5, 0);
-    stageSpot.target.position.set(L.stage.xMin + 1, 1.5, 0);
+    const stageX = (L.stage.xMin + L.stage.xMax) / 2;
+    const px = L.ledPlaneX ?? L.wallX;
+
+    const amb = new THREE.AmbientLight(0xa8b0c0, 0.42);
+    this.scene.add(amb);
+
+    const hemi = new THREE.HemisphereLight(0x6a7288, 0x282830, 0.48);
+    this.scene.add(hemi);
+
+    const key = new THREE.DirectionalLight(0xfff4e8, 0.52);
+    key.position.set(px + 8, L.roomHeightM + 2, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    this.scene.add(key);
+
+    const houseFill = new THREE.DirectionalLight(0xc8d0e0, 0.38);
+    houseFill.position.set(px + 12, 6, -4);
+    this.scene.add(houseFill);
+
+    const stageWash = new THREE.DirectionalLight(0xffe8d8, 0.34);
+    stageWash.position.set(px - 2, L.roomHeightM - 0.8, 0);
+    this.scene.add(stageWash);
+
+    const stageSpot = new THREE.SpotLight(0xfff0e0, 0.72, 32, 0.62, 0.35, 1.1);
+    stageSpot.position.set(px + 1.5, L.roomHeightM - 0.35, 0);
+    stageSpot.target.position.set(stageX, L.stage.heightM + 0.4, 0);
     this.scene.add(stageSpot);
     this.scene.add(stageSpot.target);
+
+    for (let i = -2; i <= 2; i++) {
+      const practical = new THREE.PointLight(0xffe8cc, 0.55, 14, 1.6);
+      practical.position.set(stageX + 0.5, L.roomHeightM - 0.55, i * 2.2);
+      this.scene.add(practical);
+    }
+
+    const audienceFill = new THREE.PointLight(0xb8c0d8, 0.35, 22, 1.8);
+    audienceFill.position.set(px + 7, 3.8, 0);
+    this.scene.add(audienceFill);
   }
 
   rebuildRoom() {

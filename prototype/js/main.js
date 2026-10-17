@@ -4,12 +4,13 @@ import { ensureChairTemplate } from './room.js';
 
 const canvas = document.getElementById('scene-canvas');
 const panel = document.getElementById('control-panel');
+const viewport = document.getElementById('viewport');
 
 async function start() {
   try {
     await ensureChairTemplate();
     const app = new LedVisualizerApp(canvas);
-    bindUi(app, panel);
+    bindUi(app, panel, viewport);
     window.__ledApp = app;
   } catch (err) {
     console.error('LED-Visualizer Startfehler:', err);

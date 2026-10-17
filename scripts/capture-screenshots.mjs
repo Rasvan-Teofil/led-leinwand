@@ -45,14 +45,17 @@ await capture('01-overview.png', () => {
 
 await capture('02-first-row.png', () => {
   const app = window.__ledApp;
-  app.walls.forEach((w) => w.setFlatBlend(1));
+  app.walls.forEach((w) => w.setFlatBlend(0.6));
   const L = app.layout;
   const px = L.ledPlaneX ?? L.wallX;
   const v = L.viewpoints.ersteReihe;
-  app.camera.fov = 48;
+  const w = app.getSelectedWall();
+  const cy = w.config.mountHeightM + w.config.heightM / 2;
+  const lintelY = w.config.mountHeightM + w.config.heightM + 0.42;
+  app.camera.fov = 58;
   app.camera.updateProjectionMatrix();
-  app.camera.position.set(v.x, 1.65, v.z);
-  app.orbit.target.set(px + 0.2, 2.6, 0);
+  app.camera.position.set(v.x, 1.62, 2.8);
+  app.orbit.target.set(px + 0.25, (cy + lintelY) / 2, 0);
 });
 
 await capture('03-pixel-closeup.png', () => {

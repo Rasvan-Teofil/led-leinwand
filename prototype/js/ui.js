@@ -9,58 +9,38 @@ import {
 import { createWallConfig } from './led-wall.js';
 import { jinyuanWallConfig } from './jinyuan-offer.js';
 
-export function bindUi(app, root) {
+export function bindUi(app, panelRoot, viewportRoot) {
   const els = {
-    roomDepth: root.querySelector('#room-depth'),
-    roomWidth: root.querySelector('#room-width'),
-    roomHeight: root.querySelector('#room-height'),
-    wallSelect: root.querySelector('#wall-select'),
-    addWall: root.querySelector('#add-wall'),
-    removeWall: root.querySelector('#remove-wall'),
-    wallPreset: root.querySelector('#wall-preset'),
-    wallWidth: root.querySelector('#wall-width'),
-    wallHeight: root.querySelector('#wall-height'),
-    cols: root.querySelector('#cab-cols'),
-    rows: root.querySelector('#cab-rows'),
-    cabinetPreset: root.querySelector('#cabinet-preset'),
-    pitchPreset: root.querySelector('#pitch-preset'),
-    pitchCustom: root.querySelector('#pitch-custom'),
-    mountHeight: root.querySelector('#mount-height'),
-    contentType: root.querySelector('#content-type'),
-    compareMode: root.querySelector('#compare-mode'),
-    pitchToggle: root.querySelector('#pitch-toggle'),
-    altPitch: root.querySelector('#alt-pitch'),
-    gridHint: root.querySelector('#grid-size-hint'),
-    stats: root.querySelector('#stats-panel'),
-    viewDistance: root.querySelector('#view-distance'),
-    viewDistanceLabel: root.querySelector('#view-distance-label'),
-    presetFirst: root.querySelector('#view-first'),
-    presetMid: root.querySelector('#view-mid'),
-    presetBack: root.querySelector('#view-back'),
-    presetTech: root.querySelector('#view-tech'),
-    fpMode: root.querySelector('#fp-mode'),
+    wallSelect: panelRoot.querySelector('#wall-select'),
+    addWall: panelRoot.querySelector('#add-wall'),
+    removeWall: panelRoot.querySelector('#remove-wall'),
+    wallPreset: panelRoot.querySelector('#wall-preset'),
+    wallWidth: panelRoot.querySelector('#wall-width'),
+    wallHeight: panelRoot.querySelector('#wall-height'),
+    cols: panelRoot.querySelector('#cab-cols'),
+    rows: panelRoot.querySelector('#cab-rows'),
+    cabinetPreset: panelRoot.querySelector('#cabinet-preset'),
+    pitchPreset: panelRoot.querySelector('#pitch-preset'),
+    pitchCustom: panelRoot.querySelector('#pitch-custom'),
+    mountHeight: panelRoot.querySelector('#mount-height'),
+    contentType: panelRoot.querySelector('#content-type'),
+    compareMode: panelRoot.querySelector('#compare-mode'),
+    pitchToggle: panelRoot.querySelector('#pitch-toggle'),
+    altPitch: panelRoot.querySelector('#alt-pitch'),
+    gridHint: panelRoot.querySelector('#grid-size-hint'),
+    stats: panelRoot.querySelector('#stats-panel'),
+    viewDistance: viewportRoot.querySelector('#view-distance'),
+    viewDistanceLabel: viewportRoot.querySelector('#view-distance-label'),
+    presetFirst: viewportRoot.querySelector('#view-first'),
+    presetMid: viewportRoot.querySelector('#view-mid'),
+    presetBack: viewportRoot.querySelector('#view-back'),
+    presetTech: viewportRoot.querySelector('#view-tech'),
+    fpMode: viewportRoot.querySelector('#fp-mode'),
   };
 
   fillPitchPresets(els.pitchPreset);
   fillCabinetPresets(els.cabinetPreset);
   fillWallPresets(els.wallPreset);
-
-  els.roomDepth.value = app.roomDims.hallDepthM;
-  els.roomWidth.value = app.roomDims.hallWidthM;
-  els.roomHeight.value = app.roomDims.roomHeightM;
-
-  const onRoomChange = () => {
-    app.setRoomDims({
-      hallDepthM: parseFloat(els.roomDepth.value),
-      hallWidthM: parseFloat(els.roomWidth.value),
-      roomHeightM: parseFloat(els.roomHeight.value),
-    });
-    els.viewDistance.max = app.roomDims.hallWidthM - 2;
-    refresh();
-  };
-  els.roomDepth.addEventListener('change', onRoomChange);
-  els.roomWidth.addEventListener('change', onRoomChange);
-  els.roomHeight.addEventListener('change', onRoomChange);
 
   els.addWall.addEventListener('click', () => {
     const cfg = createWallConfig({ label: `Wand ${app.walls.length + 1}` });

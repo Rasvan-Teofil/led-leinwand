@@ -47,7 +47,9 @@ export const ledWallSchema = z.object({
   panels: z.array(panelInstanceSchema),
   visible: z.boolean(),
   locked: z.boolean(),
-  color: z.string().optional()
+  color: z.string().optional(),
+  testPatternEnabled: z.boolean().optional(),
+  testPatternKind: z.enum(['smpte', 'grid', 'cabinet', 'pitch']).optional()
 })
 
 export const ledWallProjectSchema = z.object({

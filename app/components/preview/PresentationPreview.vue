@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { analyzeNativeResolution, detectOverlaps } from '#shared/calculations'
 import { wallLocalBoundingBox } from '#shared/calculations/geometry'
+import { useTestPatternCache } from '~/composables/useTestPatternCache'
 import { useEditorStore } from '~/stores/editor'
 import { useProjectStore } from '~/stores/project'
 
 const project = useProjectStore()
 const editor = useEditorStore()
+const { getWallPatternUrl } = useTestPatternCache()
 
 const wall = computed(() =>
   project.walls.find(w => w.id === editor.primaryWallId) ?? project.walls[0]
+)
+
+const useTestPattern = computed(() =>
+  Boolean(wall.value?.testPatternEnabled && !editor.previewImageDataUrl)
+)
+const testPatternUrl = computed(() =>
+  wall.value && wall.value.testPatternEnabled ? getWallPatternUrl(wall.value) : null
 )
 
 const bbox = computed(() =>
@@ -43,7 +52,7 @@ async function onUpload(e: Event) {
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 watch(
-  [wall, () => editor.previewImageDataUrl, () => editor.previewFitMode, bbox],
+  [wall, () => editor.previewImageDataUrl, () => editor.previewFitMode, bbox, testPatternUrl],
   () => drawPreview(),
   { flush: 'post' }
 )
@@ -63,7 +72,10 @@ function drawPreview() {
   const ox = (w - bbox.value.widthMm * scale) / 2
   const oy = (h - bbox.value.heightMm * scale) / 2
 
-  if (editor.previewImageDataUrl) {
+  const sourceUrl = editor.previewImageDataUrl
+    ?? (useTestPattern.value ? testPatternUrl.value : null)
+
+  if (sourceUrl) {
     const img = new Image()
     img.onload = () => {
       const dw = bbox.value!.widthMm * scale
@@ -86,7 +98,7 @@ function drawPreview() {
       ctx.drawImage(img, sx, sy, sw, sh, ox, oy, dw, dh)
       drawOutlines(ctx, ox, oy, scale)
     }
-    img.src = editor.previewImageDataUrl
+    img.src = sourceUrl
   } else {
     drawOutlines(ctx, ox, oy, scale)
   }

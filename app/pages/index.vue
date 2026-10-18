@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import CanvasEditor from '~/components/canvas/CanvasEditor.vue'
+import WallsDeleteWallModal from '~/components/walls/DeleteWallModal.vue'
+import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useKeyboardShortcuts } from '~/composables/useKeyboardShortcuts'
 import { useProjectStore } from '~/stores/project'
 import { useEditorStore } from '~/stores/editor'
@@ -10,8 +12,23 @@ const editor = useEditorStore()
 const history = useHistoryStore()
 const persistence = useProjectPersistence()
 const { onKeyDown, onKeyUp } = useKeyboardShortcuts()
+const { deleteWall } = useDeleteActions()
 
-const canvasRef = ref<{ fitAll: () => void } | null>(null)
+const deleteWallModalOpen = computed({
+  get: () => editor.pendingDeleteWallId != null,
+  set: (open: boolean) => {
+    if (!open) editor.pendingDeleteWallId = null
+  }
+})
+const pendingWallName = computed(() =>
+  project.walls.find(w => w.id === editor.pendingDeleteWallId)?.name ?? ''
+)
+
+function confirmDeleteWall() {
+  if (!editor.pendingDeleteWallId) return
+  deleteWall(editor.pendingDeleteWallId)
+  editor.pendingDeleteWallId = null
+}
 
 function ensureDemoContent() {
   if (project.walls.length === 0) {
@@ -37,10 +54,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
 })
-
-function onCanvasReady() {
-  canvasRef.value?.fitAll()
-}
 
 function seedDemoProject() {
   project.newProject('Demo LED Projekt')
@@ -91,11 +104,7 @@ useHead({ title: 'LED Wall Designer' })
       <LayoutLeftSidebar />
       <main class="flex min-w-0 flex-1 flex-col">
         <div class="relative min-h-0 flex-1">
-          <CanvasEditor
-            v-if="editor.activeView === 'editor'"
-            ref="canvasRef"
-            @ready="onCanvasReady"
-          />
+          <CanvasEditor v-if="editor.activeView === 'editor'" />
           <OptimizerResolutionOptimizer v-else-if="editor.activeView === 'optimizer'" />
           <PreviewPresentationPreview v-else-if="editor.activeView === 'preview'" />
         </div>
@@ -103,5 +112,10 @@ useHead({ title: 'LED Wall Designer' })
       </main>
       <LayoutRightSidebar />
     </div>
+    <WallsDeleteWallModal
+      v-model:open="deleteWallModalOpen"
+      :wall-name="pendingWallName"
+      @confirm="confirmDeleteWall"
+    />
   </div>
 </template>

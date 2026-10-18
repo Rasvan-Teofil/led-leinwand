@@ -12,34 +12,58 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 await page.addInitScript(() => localStorage.clear())
 await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('[data-testid="canvas-container"] canvas', { timeout: 30_000 })
-await page.waitForTimeout(1200)
-
-await page.getByText(/Jinyuan/).first().click()
-await page.waitForTimeout(400)
-await page.screenshot({ path: path.join(outDir, 'editor-two-walls.png'), fullPage: true })
-
-const bright = await page.evaluate(() => {
-  const canvas = document.querySelector('[data-testid="canvas-container"] canvas')
-  if (!canvas) return 0
-  const ctx = canvas.getContext('2d')
-  const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-  let n = 0
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i] + d[i + 1] + d[i + 2] > 40) n++
-  }
-  return n
+await page.getByTestId('canvas-fit-all').click()
+await page.getByRole('button', { name: /Jinyuan 4/ }).click()
+await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  if (!wall) return
+  api.editor.selectWall(wall.id)
+  api.project.updateWall(wall.id, { testPatternEnabled: true, testPatternKind: 'smpte' })
 })
-if (bright < 200) {
-  throw new Error(`Canvas appears empty (bright pixels=${bright})`)
+await page.waitForTimeout(1200)
+await page.screenshot({ path: path.join(outDir, 'editor-jinyuan-testpattern.png'), fullPage: true })
+
+const canvas = page.locator('[data-testid="canvas-container"] canvas').first()
+const box = await canvas.boundingBox()
+if (box) {
+  await page.mouse.click(box.x + box.width * 0.32, box.y + box.height * 0.58, { button: 'right' })
+  await page.waitForSelector('[data-testid="canvas-context-menu"]')
+  await page.screenshot({ path: path.join(outDir, 'editor-context-menu.png'), fullPage: true })
+  await page.keyboard.press('Escape')
 }
 
+const dragPoint = await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return null
+  const wall = api.project.walls.find(w => w.panels.length > 10)
+  const panel = wall?.panels[0]
+  if (!wall || !panel) return null
+  api.editor.selectPanel(wall.id, panel.id)
+  return api.getPanelClientCenter(wall.id, panel.id)
+})
+const zoomBefore = await page.getByTestId('zoom-indicator').textContent()
+if (dragPoint) {
+  await page.mouse.move(dragPoint.x, dragPoint.y)
+  await page.mouse.down()
+  await page.mouse.move(dragPoint.x + 90, dragPoint.y + 35, { steps: 10 })
+  await page.mouse.up()
+}
+await page.waitForTimeout(400)
+const zoomAfter = await page.getByTestId('zoom-indicator').textContent()
+if (zoomBefore !== zoomAfter) {
+  throw new Error(`Zoom changed after drag: ${zoomBefore} -> ${zoomAfter}`)
+}
+await page.screenshot({ path: path.join(outDir, 'editor-after-panel-drag.png'), fullPage: true })
+
 await page.getByRole('button', { name: 'Optimizer' }).click()
-await page.waitForTimeout(800)
+await page.waitForTimeout(500)
 await page.screenshot({ path: path.join(outDir, 'optimizer.png'), fullPage: true })
 
 await page.getByRole('button', { name: 'Preview' }).click()
-await page.waitForTimeout(800)
-await page.screenshot({ path: path.join(outDir, 'preview.png'), fullPage: true })
+await page.waitForTimeout(500)
+await page.screenshot({ path: path.join(outDir, 'preview-testpattern.png'), fullPage: true })
 
 await browser.close()
 console.log('Screenshots saved to', outDir)

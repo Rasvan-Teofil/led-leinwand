@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RotationDeg } from '#shared/types/panel'
+import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -7,6 +8,7 @@ import { useProjectStore } from '~/stores/project'
 const editor = useEditorStore()
 const project = useProjectStore()
 const history = useHistoryStore()
+const { deletePanel } = useDeleteActions()
 
 const menu = computed(() => editor.contextMenu)
 
@@ -48,13 +50,10 @@ function duplicatePanel() {
   close()
 }
 
-function deletePanel() {
+function onDeletePanel() {
   const m = menu.value
   if (!m?.panelId) return
-  history.pushHistory()
-  project.removePanel(m.wallId, m.panelId)
-  editor.clearSelection()
-  history.pushHistory()
+  deletePanel(m.wallId, m.panelId)
   close()
 }
 
@@ -64,6 +63,13 @@ function duplicateWall() {
   history.pushHistory()
   project.duplicateWall(m.wallId)
   history.pushHistory()
+  close()
+}
+
+function onDeleteWall() {
+  const m = menu.value
+  if (!m) return
+  editor.requestDeleteWall(m.wallId)
   close()
 }
 
@@ -81,7 +87,8 @@ onBeforeUnmount(() => {
 <template>
   <div
     v-if="menu"
-    class="fixed z-50 min-w-40 rounded-md border border-default bg-elevated py-1 text-sm shadow-lg"
+    data-testid="canvas-context-menu"
+    class="fixed z-50 min-w-44 rounded-md border border-default bg-elevated py-1 text-sm shadow-lg"
     :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
     @click.stop
   >
@@ -103,7 +110,8 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="block w-full px-3 py-1.5 text-left text-error hover:bg-default/60"
-        @click="deletePanel"
+        data-testid="context-delete-panel"
+        @click="onDeletePanel"
       >
         Panel löschen
       </button>
@@ -115,6 +123,14 @@ onBeforeUnmount(() => {
         @click="duplicateWall"
       >
         Wand duplizieren
+      </button>
+      <button
+        type="button"
+        class="block w-full px-3 py-1.5 text-left text-error hover:bg-default/60"
+        data-testid="context-delete-wall"
+        @click="onDeleteWall"
+      >
+        Wand löschen
       </button>
     </template>
   </div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type Konva from 'konva'
-import { Group, Rect, Text, Line } from 'vue-konva'
+import { Group, Rect, Text, Line, Image as KonvaImage, useImage } from 'vue-konva'
 import PanelRenderer from '~/components/canvas/PanelRenderer.vue'
+import { useTestPatternCache } from '~/composables/useTestPatternCache'
 import type { LEDWall } from '#shared/types/wall'
 import { wallLocalBoundingBox } from '#shared/calculations/geometry'
 import { useEditorStore } from '~/stores/editor'
@@ -24,6 +25,14 @@ const emit = defineEmits<{
 
 const project = useProjectStore()
 const editor = useEditorStore()
+const { getWallPatternUrl } = useTestPatternCache()
+
+const patternUrl = computed(() => {
+  if (!props.wall.testPatternEnabled) return ''
+  return getWallPatternUrl(props.wall) ?? ''
+})
+const [patternImage] = useImage(patternUrl)
+
 const bbox = computed(() =>
   wallLocalBoundingBox(props.wall, project.defsById)
 )
@@ -104,10 +113,22 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         stroke: wallSelected ? '#38bdf8' : '#334155',
         strokeWidth: wallSelected ? 2 : 1,
         dash: [6, 4],
-        fill: 'rgba(15,23,42,0.35)',
+        fill: wall.testPatternEnabled ? 'rgba(15,23,42,0.15)' : 'rgba(15,23,42,0.35)',
         listening: true
       }"
       @contextmenu="onWallContextMenu"
+    />
+    <KonvaImage
+      v-if="bbox && patternImage && wall.testPatternEnabled"
+      :config="{
+        x: bbox.xMm * zoom,
+        y: bbox.yMm * zoom,
+        width: bbox.widthMm * zoom,
+        height: bbox.heightMm * zoom,
+        image: patternImage,
+        listening: false,
+        opacity: 0.92
+      }"
     />
     <Text
       :config="{

@@ -1,11 +1,11 @@
+import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
-import { useProjectStore } from '~/stores/project'
 
 export function useKeyboardShortcuts() {
   const editor = useEditorStore()
   const history = useHistoryStore()
-  const project = useProjectStore()
+  const { deletePanel } = useDeleteActions()
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -26,16 +26,16 @@ export function useKeyboardShortcuts() {
     if (e.key === 'Escape') {
       editor.clearSelection()
       editor.dragPanelDefinitionId = null
+      editor.contextMenu = null
     }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const wallId = editor.primaryWallId
       if (!wallId) return
+      e.preventDefault()
       if (editor.primaryPanelId) {
-        history.pushHistory()
-        project.removePanel(wallId, editor.primaryPanelId)
-        editor.clearSelection()
-        history.pushHistory()
-        e.preventDefault()
+        deletePanel(wallId, editor.primaryPanelId)
+      } else {
+        editor.requestDeleteWall(wallId)
       }
     }
   }

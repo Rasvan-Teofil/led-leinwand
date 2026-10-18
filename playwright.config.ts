@@ -11,7 +11,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 }
   },
   webServer: {
-    command: 'pnpm run dev --port 3000 --host 127.0.0.1',
+    command: 'NUXT_TELEMETRY_DISABLED=1 CI=1 pnpm run dev --port 3000 --host 127.0.0.1',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000

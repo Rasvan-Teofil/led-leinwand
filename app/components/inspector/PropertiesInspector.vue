@@ -2,6 +2,8 @@
 import type { RotationDeg } from '#shared/types/panel'
 import { pitchXMm, pitchYMm } from '#shared/types/panel'
 import { WARNING_LABELS_DE } from '#shared/i18n/messages-de'
+import type { TestPatternKind } from '#shared/types/wall'
+import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useWallMetrics } from '~/composables/useWallMetrics'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
@@ -10,6 +12,14 @@ import { useProjectStore } from '~/stores/project'
 const project = useProjectStore()
 const editor = useEditorStore()
 const history = useHistoryStore()
+const { deletePanel } = useDeleteActions()
+
+const patternKinds: Array<{ label: string, value: TestPatternKind }> = [
+  { label: 'SMPTE-Farbbalken', value: 'smpte' },
+  { label: 'Raster & Kreuz', value: 'grid' },
+  { label: 'Panel-Nummerierung', value: 'cabinet' },
+  { label: 'Pixel-Pitch-Checker', value: 'pitch' }
+]
 
 const wall = computed(() =>
   project.walls.find(w => w.id === editor.primaryWallId)
@@ -32,11 +42,23 @@ function rotatePanel(deg: RotationDeg) {
   history.pushHistory()
 }
 
-function deletePanel() {
+function onDeletePanel() {
   if (!wall.value || !panel.value) return
+  deletePanel(wall.value.id, panel.value.id)
+}
+
+function onDeleteWall() {
+  if (!wall.value) return
+  editor.requestDeleteWall(wall.value.id)
+}
+
+function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind }) {
+  if (!wall.value) return
   history.pushHistory()
-  project.removePanel(wall.value.id, panel.value.id)
-  editor.clearSelection()
+  project.updateWall(wall.value.id, {
+    testPatternEnabled: patch.enabled ?? wall.value.testPatternEnabled,
+    testPatternKind: patch.kind ?? wall.value.testPatternKind ?? 'smpte'
+  })
   history.pushHistory()
 }
 </script>
@@ -70,6 +92,31 @@ function deletePanel() {
         </UFormField>
       </div>
       <WallsWallBuilder />
+      <UFormField label="Testbild auf Wand">
+        <div class="space-y-2">
+          <UCheckbox
+            :model-value="wall.testPatternEnabled ?? false"
+            label="Testbild anzeigen"
+            data-testid="wall-testpattern-toggle"
+            @update:model-value="(v) => updateTestPattern({ enabled: Boolean(v) })"
+          />
+          <USelect
+            :model-value="wall.testPatternKind ?? 'smpte'"
+            :items="patternKinds"
+            :disabled="!wall.testPatternEnabled"
+            @update:model-value="(v) => updateTestPattern({ kind: v as TestPatternKind })"
+          />
+        </div>
+      </UFormField>
+      <UButton
+        color="error"
+        variant="soft"
+        size="sm"
+        icon="i-lucide-trash-2"
+        label="Wand löschen"
+        data-testid="inspector-delete-wall"
+        @click="onDeleteWall"
+      />
       <dl
         v-if="metrics"
         class="space-y-1 rounded-md border border-default bg-default/30 p-2 text-xs"
@@ -163,8 +210,10 @@ function deletePanel() {
         color="error"
         variant="soft"
         size="sm"
-        label="Panel entfernen"
-        @click="deletePanel"
+        icon="i-lucide-trash-2"
+        label="Panel löschen"
+        data-testid="inspector-delete-panel"
+        @click="onDeletePanel"
       />
     </template>
 

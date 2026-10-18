@@ -53,6 +53,7 @@ const rectConfig = computed(() => {
 
 function onClick(e: Konva.KonvaEventObject<MouseEvent>) {
   e.cancelBubble = true
+  if (e.target.getStage()?.isDragging?.()) return
   emit('select', e.evt.shiftKey)
 }
 

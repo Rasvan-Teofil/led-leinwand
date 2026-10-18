@@ -32,7 +32,9 @@ export const useEditorStore = defineStore('editor', {
       y: number
       wallId: string
       panelId?: string
-    } | null
+    } | null,
+    canvasDragging: false,
+    pendingDeleteWallId: null as string | null
   }),
   getters: {
     primaryWallId: s => s.selection.wallIds[0] ?? null,
@@ -75,6 +77,9 @@ export const useEditorStore = defineStore('editor', {
     },
     setView(view: EditorView) {
       this.activeView = view
+    },
+    requestDeleteWall(wallId: string) {
+      this.pendingDeleteWallId = wallId
     }
   }
 })

@@ -8,7 +8,8 @@ export const useHistoryStore = defineStore('history', {
   state: () => ({
     past: [] as LEDWallProject[],
     future: [] as LEDWallProject[],
-    recording: true
+    recording: true,
+    dragActive: false
   }),
   getters: {
     canUndo: s => s.past.length > 0,
@@ -56,6 +57,18 @@ export const useHistoryStore = defineStore('history', {
       this.pushHistory()
       fn()
       this.pushHistory()
+    },
+    beginDrag() {
+      if (!this.dragActive) {
+        this.pushHistory()
+        this.dragActive = true
+      }
+    },
+    endDrag() {
+      if (this.dragActive) {
+        this.pushHistory()
+        this.dragActive = false
+      }
     }
   }
 })

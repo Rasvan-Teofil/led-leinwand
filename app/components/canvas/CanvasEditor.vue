@@ -99,14 +99,14 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
 })
 
-watch(
-  () => [project.walls.length, project.walls.reduce((n, w) => n + w.panels.length, 0)],
-  () => {
-    if (stageMounted.value) {
-      nextTick(() => fitAll())
-    }
-  }
+const layoutSignature = computed(
+  () => `${project.walls.length}:${project.walls.reduce((n, w) => n + w.panels.length, 0)}`
 )
+watch(layoutSignature, (next, prev) => {
+  if (next !== prev && stageMounted.value) {
+    nextTick(() => fitAll())
+  }
+})
 
 const visibleWalls = computed(() =>
   project.walls.filter(w => w.visible)
@@ -145,7 +145,7 @@ function onStageMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
     panStart.panY = editor.panY
     return
   }
-  if (e.target === stage) {
+  if (e.target === stage && !editor.canvasDragging) {
     editor.clearSelection()
   }
 }
@@ -161,13 +161,15 @@ function onStageMouseMove(e: Konva.KonvaEventObject<MouseEvent>) {
 function onStageMouseUp() {
   isPanning.value = false
   if (dragPanelStart.value) {
-    history.pushHistory()
+    history.endDrag()
     dragPanelStart.value = null
+    editor.canvasDragging = false
   }
 }
 
 function onPanelDragStart(wallId: string, panelId: string) {
-  history.pushHistory()
+  history.beginDrag()
+  editor.canvasDragging = true
   dragPanelStart.value = { wallId, panelId, x: 0, y: 0 }
 }
 
@@ -237,7 +239,10 @@ defineExpose({ fitAll, resetView })
     <div
       class="pointer-events-none absolute bottom-3 left-3 flex gap-2 text-xs text-muted"
     >
-      <span class="rounded bg-elevated/90 px-2 py-1">{{ Math.round(editor.zoom * 100) }}%</span>
+      <span
+        data-testid="zoom-indicator"
+        class="rounded bg-elevated/90 px-2 py-1"
+      >{{ Math.round(editor.zoom * 100) }}%</span>
       <span
         v-if="editor.preferences.snapEnabled"
         class="rounded bg-elevated/90 px-2 py-1"
@@ -249,6 +254,7 @@ defineExpose({ fitAll, resetView })
         size="xs"
         variant="soft"
         icon="i-lucide-maximize"
+        data-testid="canvas-fit-all"
         @click="fitAll"
       />
       <UButton

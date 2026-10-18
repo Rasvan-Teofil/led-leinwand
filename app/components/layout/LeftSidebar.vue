@@ -115,6 +115,14 @@ function saveCustomPanel(def: PanelDefinition) {
                   icon="i-lucide-copy"
                   @click="project.duplicateWall(wall.id)"
                 />
+                <UButton
+                  size="xs"
+                  variant="ghost"
+                  color="error"
+                  icon="i-lucide-trash-2"
+                  data-testid="sidebar-delete-wall"
+                  @click="editor.requestDeleteWall(wall.id)"
+                />
               </div>
             </div>
           </li>

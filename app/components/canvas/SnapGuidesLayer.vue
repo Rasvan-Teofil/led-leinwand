@@ -59,8 +59,8 @@ const dropPreview = computed(() => {
     <Line
       :config="{
         points: line.points,
-        stroke: '#f472b6',
-        strokeWidth: 1.5,
+        stroke: '#fb7185',
+        strokeWidth: 2.5,
         dash: [6, 4],
         listening: false
       }"

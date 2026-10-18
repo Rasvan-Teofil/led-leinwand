@@ -1,0 +1,172 @@
+<script setup lang="ts">
+import type { RotationDeg } from '#shared/types/panel'
+import { pitchXMm, pitchYMm } from '#shared/types/panel'
+import { useWallMetrics } from '~/composables/useWallMetrics'
+import { useEditorStore } from '~/stores/editor'
+import { useHistoryStore } from '~/stores/history'
+import { useProjectStore } from '~/stores/project'
+
+const project = useProjectStore()
+const editor = useEditorStore()
+const history = useHistoryStore()
+
+const wall = computed(() =>
+  project.walls.find(w => w.id === editor.primaryWallId)
+)
+const panel = computed(() => {
+  const w = wall.value
+  if (!w) return null
+  return w.panels.find(p => p.id === editor.primaryPanelId) ?? null
+})
+const panelDef = computed(() =>
+  panel.value ? project.defsById.get(panel.value.panelDefinitionId) : null
+)
+
+const metrics = useWallMetrics(() => wall.value)
+
+function rotatePanel(deg: RotationDeg) {
+  if (!wall.value || !panel.value) return
+  history.pushHistory()
+  project.updatePanel(wall.value.id, panel.value.id, { rotation: deg })
+  history.pushHistory()
+}
+
+function deletePanel() {
+  if (!wall.value || !panel.value) return
+  history.pushHistory()
+  project.removePanel(wall.value.id, panel.value.id)
+  editor.clearSelection()
+  history.pushHistory()
+}
+</script>
+
+<template>
+  <div class="space-y-4 p-3 text-sm">
+    <template v-if="wall && !panel">
+      <h3 class="font-semibold">
+        Wand-Eigenschaften
+      </h3>
+      <UFormField label="Name">
+        <UInput
+          :model-value="wall.name"
+          @update:model-value="(v) => project.updateWall(wall!.id, { name: String(v) })"
+        />
+      </UFormField>
+      <div class="grid grid-cols-2 gap-2">
+        <UFormField label="X (mm)">
+          <UInput
+            :model-value="wall.xMm"
+            type="number"
+            @update:model-value="(v) => project.updateWall(wall!.id, { xMm: Number(v) })"
+          />
+        </UFormField>
+        <UFormField label="Y (mm)">
+          <UInput
+            :model-value="wall.yMm"
+            type="number"
+            @update:model-value="(v) => project.updateWall(wall!.id, { yMm: Number(v) })"
+          />
+        </UFormField>
+      </div>
+      <WallsWallBuilder />
+      <dl
+        v-if="metrics"
+        class="space-y-1 rounded-md border border-default bg-default/30 p-2 text-xs"
+      >
+        <div class="flex justify-between">
+          <dt class="text-muted">
+            BBox
+          </dt>
+          <dd class="font-mono text-highlighted">
+            {{ metrics.dims.bboxWidthMm }}×{{ metrics.dims.bboxHeightMm }} mm
+          </dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-muted">
+            Aktive Fläche
+          </dt>
+          <dd class="font-mono">
+            {{ metrics.dims.activeAreaM2.toFixed(2) }} m²
+          </dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-muted">
+            Panels
+          </dt>
+          <dd>{{ metrics.dims.enabledPanelCount }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-muted">
+            Native Auflösung
+          </dt>
+          <dd class="font-mono">
+            <span v-if="metrics.resolution.valid">
+              {{ metrics.resolution.resolutionX }}×{{ metrics.resolution.resolutionY }}
+            </span>
+            <span
+              v-else
+              class="text-warning"
+            >n/a</span>
+          </dd>
+        </div>
+        <div
+          v-if="metrics.resolution.warnings.length"
+          class="text-warning"
+        >
+          {{ metrics.resolution.warnings.join(', ') }}
+        </div>
+      </dl>
+    </template>
+
+    <template v-else-if="wall && panel && panelDef && editor.primaryWallId && editor.primaryPanelId">
+      <h3 class="font-semibold">
+        Panel-Instanz
+      </h3>
+      <p class="text-xs text-muted">
+        {{ panelDef.name }}
+      </p>
+      <div class="grid grid-cols-2 gap-2">
+        <UFormField label="X (mm)">
+          <UInput
+            :model-value="panel.xMm"
+            type="number"
+            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { xMm: Number(v) })"
+          />
+        </UFormField>
+        <UFormField label="Y (mm)">
+          <UInput
+            :model-value="panel.yMm"
+            type="number"
+            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { yMm: Number(v) })"
+          />
+        </UFormField>
+      </div>
+      <UFormField label="Rotation">
+        <USelect
+          :model-value="panel.rotation"
+          :items="panelDef.allowedRotations.map((r) => ({ label: `${r}°`, value: r }))"
+          @update:model-value="(v) => rotatePanel(Number(v) as RotationDeg)"
+        />
+      </UFormField>
+      <dl class="space-y-1 text-xs text-muted">
+        <div>Physikalisch: {{ panelDef.widthMm }}×{{ panelDef.heightMm }} mm</div>
+        <div>Pixel: {{ panelDef.resolutionX }}×{{ panelDef.resolutionY }}</div>
+        <div>Pitch: {{ pitchXMm(panelDef).toFixed(3) }}×{{ pitchYMm(panelDef).toFixed(3) }} mm</div>
+      </dl>
+      <UButton
+        color="error"
+        variant="soft"
+        size="sm"
+        label="Panel entfernen"
+        @click="deletePanel"
+      />
+    </template>
+
+    <p
+      v-else
+      class="text-muted text-sm"
+    >
+      Wand oder Panel auswählen, um Eigenschaften zu bearbeiten.
+    </p>
+  </div>
+</template>

@@ -5,6 +5,7 @@ import { WARNING_LABELS_DE } from '#shared/i18n/messages-de'
 import type { TestPatternKind } from '#shared/types/wall'
 import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useWallMetrics } from '~/composables/useWallMetrics'
+import { useWallOverviewSummary } from '~/composables/useWallOverviewSummary'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -34,6 +35,7 @@ const panelDef = computed(() =>
 )
 
 const metrics = useWallMetrics(() => wall.value)
+const overview = useWallOverviewSummary()
 
 function rotatePanel(deg: RotationDeg) {
   if (!wall.value || !panel.value) return
@@ -65,6 +67,10 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
 
 <template>
   <div class="space-y-4 p-3 text-sm">
+    <WallsWallGesamtuebersichtCard
+      title="Gesamtübersicht"
+      :summary="overview"
+    />
     <template v-if="wall && !panel">
       <h3 class="font-semibold">
         Wand-Eigenschaften

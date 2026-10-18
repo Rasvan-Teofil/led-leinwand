@@ -14,6 +14,7 @@ await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('[data-testid="canvas-container"] canvas', { timeout: 30_000 })
 await page.getByTestId('canvas-fit-all').click()
 await page.getByRole('button', { name: /Jinyuan 4/ }).click()
+await page.locator('[data-testid="gesamtuebersicht-card"]').first().waitFor({ state: 'visible', timeout: 10_000 })
 await page.evaluate(() => {
   const api = window.__ledDesignerTest
   if (!api) return

@@ -43,6 +43,32 @@ await page.evaluate(() => {
 await page.waitForTimeout(300)
 await page.screenshot({ path: path.join(outDir, 'editor-jinyuan-testpattern.png'), fullPage: true })
 
+await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  if (!wall) return
+  api.project.updateWall(wall.id, { testPatternKind: 'coverage' })
+})
+await page.waitForTimeout(900)
+const coverageOk = await page.evaluate(async () => {
+  const api = window.__ledDesignerTest
+  if (!api) return false
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  if (!wall) return false
+  const r = await api.assertWallTestPatternCoverage(wall.id)
+  return r.ok
+})
+if (!coverageOk) throw new Error('Coverage test pattern does not cover all panels')
+await page.screenshot({ path: path.join(outDir, 'editor-jinyuan-coverage.png'), fullPage: true })
+await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  if (!wall) return
+  api.project.updateWall(wall.id, { testPatternKind: 'smpte' })
+})
+
 const canvas = page.locator('[data-testid="canvas-container"] canvas').first()
 const box = await canvas.boundingBox()
 if (box) {

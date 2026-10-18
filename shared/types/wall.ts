@@ -1,6 +1,6 @@
 import type { PanelInstance } from './panel'
 
-export type TestPatternKind = 'smpte' | 'grid' | 'cabinet' | 'pitch'
+export type TestPatternKind = 'smpte' | 'grid' | 'cabinet' | 'pitch' | 'coverage'
 
 export interface LEDWall {
   id: string

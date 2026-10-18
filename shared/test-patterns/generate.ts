@@ -5,7 +5,7 @@ import type { PanelDefinition } from '../types/panel'
 import { occupiedSizeMm } from '../types/panel'
 import type { LEDWall } from '../types/wall'
 
-export type TestPatternKind = 'smpte' | 'grid' | 'cabinet' | 'pitch'
+export type TestPatternKind = 'smpte' | 'grid' | 'cabinet' | 'pitch' | 'coverage'
 
 export interface TestPatternInput {
   wall: LEDWall
@@ -259,18 +259,93 @@ function drawPattern(
     case 'pitch':
       drawPitch(ctx, w, h)
       break
+    case 'coverage':
+      drawCoverage(ctx, w, h)
+      break
   }
 }
 
+/** Approximate SMPTE RP 219 100% bars (top 75% + detailed bottom 25%). */
 function drawSmpte(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const colors = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0']
-  const barW = w / colors.length
-  colors.forEach((c, i) => {
-    ctx.fillStyle = c
-    ctx.fillRect(i * barW, 0, barW + 1, h * 0.75)
-  })
-  ctx.fillStyle = '#1a1a1a'
-  ctx.fillRect(0, h * 0.75, w, h * 0.25)
+  const topH = h * 0.75
+  const botY = topH
+  const botH = h - topH
+  const midBot = botY + botH / 2
+
+  const topColors = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0']
+  const barW = w / topColors.length
+  for (let i = 0; i < topColors.length; i++) {
+    ctx.fillStyle = topColors[i]!
+    ctx.fillRect(i * barW, 0, barW + 1, topH)
+  }
+
+  const reverseColors = [
+    '#0000c0',
+    '#000000',
+    '#c000c0',
+    '#000000',
+    '#00c0c0',
+    '#000000',
+    '#ffffff'
+  ]
+  const revW = w / reverseColors.length
+  for (let i = 0; i < reverseColors.length; i++) {
+    ctx.fillStyle = reverseColors[i]!
+    ctx.fillRect(i * revW, botY, revW + 1, botH / 2)
+  }
+
+  const plugeSegments: Array<{ frac: number, color: string }> = [
+    { frac: 0.1, color: '#101010' },
+    { frac: 0.1, color: '#00c0c0' },
+    { frac: 0.1, color: '#ffffff' },
+    { frac: 0.1, color: '#c000c0' },
+    { frac: 0.15, color: '#000000' },
+    { frac: 0.35, color: '#0a0a0a' },
+    { frac: 0.1, color: '#101010' }
+  ]
+  let x = 0
+  for (const seg of plugeSegments) {
+    const segW = w * seg.frac
+    ctx.fillStyle = seg.color
+    ctx.fillRect(x, midBot, segW + 1, botH / 2)
+    x += segW
+  }
+}
+
+function drawCoverage(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const grad = ctx.createLinearGradient(0, 0, w, h)
+  grad.addColorStop(0, '#ff2d6a')
+  grad.addColorStop(0.35, '#ffc400')
+  grad.addColorStop(0.65, '#00d4ff')
+  grad.addColorStop(1, '#5dff4a')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, w, h)
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.lineWidth = Math.max(2, w / 200)
+  const step = Math.max(10, Math.round(Math.min(w, h) / 40))
+  for (let x = 0; x <= w; x += step) {
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, h)
+    ctx.stroke()
+  }
+  for (let y = 0; y <= h; y += step) {
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(w, y)
+    ctx.stroke()
+  }
+  ctx.lineWidth = Math.max(3, w / 100)
+  ctx.beginPath()
+  ctx.arc(w / 2, h / 2, Math.min(w, h) * 0.36, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(w / 2, 0)
+  ctx.lineTo(w / 2, h)
+  ctx.moveTo(0, h / 2)
+  ctx.lineTo(w, h / 2)
+  ctx.stroke()
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {

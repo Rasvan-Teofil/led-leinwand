@@ -8,6 +8,7 @@ import type { PanelDefinition, PanelInstance, RotationDeg } from '#shared/types/
 import type { LEDWall } from '#shared/types/wall'
 import { SCHEMA_VERSION, type LEDWallProject } from '#shared/types/project'
 import { createId } from '#shared/utils/id'
+import { roundPositionMm, roundPositionPatch } from '#shared/utils/position'
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
@@ -69,7 +70,7 @@ export const useProjectStore = defineStore('project', {
     updateWall(wallId: string, patch: Partial<LEDWall>) {
       const wall = this.project.walls.find(w => w.id === wallId)
       if (!wall) return
-      Object.assign(wall, patch)
+      Object.assign(wall, roundPositionPatch(patch))
       this.touch()
     },
     setRectangularWall(
@@ -122,11 +123,14 @@ export const useProjectStore = defineStore('project', {
       const wall = this.project.walls.find(w => w.id === wallId)
       const panel = wall?.panels.find(p => p.id === panelId)
       if (!panel) return
-      Object.assign(panel, patch)
+      Object.assign(panel, roundPositionPatch(patch))
       this.touch()
     },
     movePanel(wallId: string, panelId: string, xMm: number, yMm: number) {
-      this.updatePanel(wallId, panelId, { xMm, yMm })
+      this.updatePanel(wallId, panelId, {
+        xMm: roundPositionMm(xMm),
+        yMm: roundPositionMm(yMm)
+      })
     },
     movePanelToWall(
       fromWallId: string,
@@ -145,8 +149,8 @@ export const useProjectStore = defineStore('project', {
       const panel = from.panels.find(p => p.id === panelId)
       if (!panel) return
       from.panels = from.panels.filter(p => p.id !== panelId)
-      panel.xMm = xMm
-      panel.yMm = yMm
+      panel.xMm = roundPositionMm(xMm)
+      panel.yMm = roundPositionMm(yMm)
       to.panels.push(panel)
       this.touch()
     },

@@ -8,6 +8,8 @@ import { useWallMetrics } from '~/composables/useWallMetrics'
 import { useWallOverviewSummary } from '~/composables/useWallOverviewSummary'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
+import { formatIntegerDe } from '#shared/format/de-de'
+import { roundPositionMm } from '#shared/utils/position'
 import { useProjectStore } from '~/stores/project'
 
 const project = useProjectStore()
@@ -17,6 +19,7 @@ const { deletePanel } = useDeleteActions()
 
 const patternKinds: Array<{ label: string, value: TestPatternKind }> = [
   { label: 'SMPTE-Farbbalken', value: 'smpte' },
+  { label: 'Vollfläche (Gradient/Raster)', value: 'coverage' },
   { label: 'Raster & Kreuz', value: 'grid' },
   { label: 'Panel-Nummerierung', value: 'cabinet' },
   { label: 'Pixel-Pitch-Checker', value: 'pitch' }
@@ -84,16 +87,16 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
       <div class="grid grid-cols-2 gap-2">
         <UFormField label="X (mm)">
           <UInput
-            :model-value="wall.xMm"
-            type="number"
-            @update:model-value="(v) => project.updateWall(wall!.id, { xMm: Number(v) })"
+            :model-value="formatIntegerDe(wall.xMm)"
+            inputmode="numeric"
+            @update:model-value="(v) => project.updateWall(wall!.id, { xMm: roundPositionMm(Number(String(v).replace(/\s/g, '').replace(',', '.'))) })"
           />
         </UFormField>
         <UFormField label="Y (mm)">
           <UInput
-            :model-value="wall.yMm"
-            type="number"
-            @update:model-value="(v) => project.updateWall(wall!.id, { yMm: Number(v) })"
+            :model-value="formatIntegerDe(wall.yMm)"
+            inputmode="numeric"
+            @update:model-value="(v) => project.updateWall(wall!.id, { yMm: roundPositionMm(Number(String(v).replace(/\s/g, '').replace(',', '.'))) })"
           />
         </UFormField>
       </div>
@@ -187,16 +190,16 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
       <div class="grid grid-cols-2 gap-2">
         <UFormField label="X (mm)">
           <UInput
-            :model-value="panel.xMm"
-            type="number"
-            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { xMm: Number(v) })"
+            :model-value="formatIntegerDe(panel.xMm)"
+            inputmode="numeric"
+            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { xMm: roundPositionMm(Number(String(v).replace(/\s/g, '').replace(',', '.'))) })"
           />
         </UFormField>
         <UFormField label="Y (mm)">
           <UInput
-            :model-value="panel.yMm"
-            type="number"
-            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { yMm: Number(v) })"
+            :model-value="formatIntegerDe(panel.yMm)"
+            inputmode="numeric"
+            @update:model-value="(v) => project.updatePanel(editor.primaryWallId!, editor.primaryPanelId!, { yMm: roundPositionMm(Number(String(v).replace(/\s/g, '').replace(',', '.'))) })"
           />
         </UFormField>
       </div>

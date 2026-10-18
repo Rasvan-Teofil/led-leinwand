@@ -49,7 +49,7 @@ export const ledWallSchema = z.object({
   locked: z.boolean(),
   color: z.string().optional(),
   testPatternEnabled: z.boolean().optional(),
-  testPatternKind: z.enum(['smpte', 'grid', 'cabinet', 'pitch']).optional()
+  testPatternKind: z.enum(['smpte', 'grid', 'cabinet', 'pitch', 'coverage']).optional()
 })
 
 export const ledWallProjectSchema = z.object({

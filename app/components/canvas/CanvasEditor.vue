@@ -4,9 +4,11 @@ import { Stage, Layer } from 'vue-konva'
 import CanvasGrid from '~/components/canvas/CanvasGrid.vue'
 import WallRenderer from '~/components/canvas/WallRenderer.vue'
 import CanvasContextMenu from '~/components/canvas/CanvasContextMenu.vue'
-import { detectOverlaps, snapValue, unionBoundingBox } from '#shared/calculations/geometry'
+import { detectOverlaps, unionBoundingBox } from '#shared/calculations/geometry'
 import { occupiedSizeMm } from '#shared/types/panel'
+import SnapGuidesLayer from '~/components/canvas/SnapGuidesLayer.vue'
 import { useCanvasNavigation } from '~/composables/useCanvasNavigation'
+import { usePanelSnap } from '~/composables/usePanelSnap'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -17,6 +19,7 @@ const project = useProjectStore()
 const editor = useEditorStore()
 const history = useHistoryStore()
 const { zoomAt, fitToContent, resetView } = useCanvasNavigation()
+const { snapOnWallLocal, snapFromPointerClient } = usePanelSnap()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const isClient = ref(false)
@@ -164,6 +167,7 @@ function onStageMouseUp() {
     history.endDrag()
     dragPanelStart.value = null
     editor.canvasDragging = false
+    editor.clearSnapGuides()
   }
 }
 
@@ -173,19 +177,103 @@ function onPanelDragStart(wallId: string, panelId: string) {
   dragPanelStart.value = { wallId, panelId, x: 0, y: 0 }
 }
 
+function applyPanelPosition(
+  fromWallId: string,
+  panelId: string,
+  localXMm: number,
+  localYMm: number
+) {
+  const wall = project.walls.find(w => w.id === fromWallId)
+  const panel = wall?.panels.find(p => p.id === panelId)
+  if (!wall || !panel) return
+  const snapped = snapOnWallLocal(
+    fromWallId,
+    localXMm,
+    localYMm,
+    panel.panelDefinitionId,
+    panel.rotation,
+    panelId
+  )
+  editor.setSnapGuides(snapped.guides)
+  if (snapped.wallId === fromWallId) {
+    project.movePanel(fromWallId, panelId, snapped.localXMm, snapped.localYMm)
+  } else {
+    project.movePanelToWall(
+      fromWallId,
+      panelId,
+      snapped.wallId,
+      snapped.localXMm,
+      snapped.localYMm
+    )
+    editor.selectPanel(snapped.wallId, panelId)
+  }
+}
+
 function onPanelDragMove(
   wallId: string,
   panelId: string,
   xMm: number,
   yMm: number
 ) {
-  let nx = xMm
-  let ny = yMm
-  if (editor.preferences.snapEnabled) {
-    nx = snapValue(nx, editor.preferences.snapMm)
-    ny = snapValue(ny, editor.preferences.snapMm)
+  applyPanelPosition(wallId, panelId, xMm, yMm)
+}
+
+function onPanelDragEnd(
+  wallId: string,
+  panelId: string,
+  xMm: number,
+  yMm: number
+) {
+  applyPanelPosition(wallId, panelId, xMm, yMm)
+  editor.clearSnapGuides()
+}
+
+function onCanvasDragOver(e: DragEvent) {
+  e.preventDefault()
+  const defId = editor.dragPanelDefinitionId
+  if (!defId) return
+  const def = project.defsById.get(defId)
+  if (!def) return
+  const placement = snapFromPointerClient(e.clientX, e.clientY, defId, 0)
+  if (!placement) return
+  const size = occupiedSizeMm(def, 0)
+  editor.libraryDropPreview = {
+    wallId: placement.wallId,
+    localXMm: placement.localXMm,
+    localYMm: placement.localYMm,
+    widthMm: size.widthMm,
+    heightMm: size.heightMm
   }
-  project.movePanel(wallId, panelId, nx, ny)
+  editor.setSnapGuides(placement.guides)
+}
+
+function onCanvasDrop(e: DragEvent) {
+  e.preventDefault()
+  const defId = editor.dragPanelDefinitionId
+  editor.dragPanelDefinitionId = null
+  editor.libraryDropPreview = null
+  editor.clearSnapGuides()
+  if (!defId) return
+  const placement = snapFromPointerClient(e.clientX, e.clientY, defId, 0)
+  if (!placement) return
+  history.pushHistory()
+  const newId = project.addPanel(
+    placement.wallId,
+    defId,
+    placement.localXMm,
+    placement.localYMm
+  )
+  if (newId) {
+    editor.selectPanel(placement.wallId, newId)
+  }
+  history.pushHistory()
+}
+
+function onCanvasDragLeave() {
+  editor.libraryDropPreview = null
+  if (!editor.canvasDragging) {
+    editor.clearSnapGuides()
+  }
 }
 
 defineExpose({ fitAll, resetView })
@@ -196,7 +284,9 @@ defineExpose({ fitAll, resetView })
     ref="containerRef"
     class="relative h-full min-h-0 w-full flex-1 bg-[#0b0f14]"
     data-testid="canvas-container"
-    @dragover.prevent
+    @dragover="onCanvasDragOver"
+    @drop="onCanvasDrop"
+    @dragleave="onCanvasDragLeave"
   >
     <Stage
       v-if="isClient"
@@ -232,6 +322,14 @@ defineExpose({ fitAll, resetView })
           @select-panel="(panelId, additive) => editor.selectPanel(wall.id, panelId, additive)"
           @panel-drag-start="onPanelDragStart(wall.id, $event)"
           @panel-drag-move="(panelId: string, x: number, y: number) => onPanelDragMove(wall.id, panelId, x, y)"
+          @panel-drag-end="(panelId: string, x: number, y: number) => onPanelDragEnd(wall.id, panelId, x, y)"
+        />
+      </Layer>
+      <Layer>
+        <SnapGuidesLayer
+          :zoom="editor.zoom"
+          :pan-x="editor.panX"
+          :pan-y="editor.panY"
         />
       </Layer>
     </Stage>
@@ -246,7 +344,7 @@ defineExpose({ fitAll, resetView })
       <span
         v-if="editor.preferences.snapEnabled"
         class="rounded bg-elevated/90 px-2 py-1"
-      >Snap {{ editor.preferences.snapMm }} mm</span>
+      >Snap {{ editor.preferences.snapMm }} mm · Alt frei</span>
     </div>
 
     <div class="absolute bottom-3 right-3 flex gap-1">

@@ -15,6 +15,9 @@ export function useKeyboardShortcuts() {
       editor.spacePanning = true
       e.preventDefault()
     }
+    if (e.key === 'Alt') {
+      editor.snapOverrideDisabled = true
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
       history.undo()
@@ -43,6 +46,9 @@ export function useKeyboardShortcuts() {
   function onKeyUp(e: KeyboardEvent) {
     if (e.code === 'Space') {
       editor.spacePanning = false
+    }
+    if (e.key === 'Alt') {
+      editor.snapOverrideDisabled = false
     }
   }
 

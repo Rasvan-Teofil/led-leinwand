@@ -128,6 +128,28 @@ export const useProjectStore = defineStore('project', {
     movePanel(wallId: string, panelId: string, xMm: number, yMm: number) {
       this.updatePanel(wallId, panelId, { xMm, yMm })
     },
+    movePanelToWall(
+      fromWallId: string,
+      panelId: string,
+      toWallId: string,
+      xMm: number,
+      yMm: number
+    ) {
+      if (fromWallId === toWallId) {
+        this.movePanel(fromWallId, panelId, xMm, yMm)
+        return
+      }
+      const from = this.project.walls.find(w => w.id === fromWallId)
+      const to = this.project.walls.find(w => w.id === toWallId)
+      if (!from || !to || from.locked || to.locked) return
+      const panel = from.panels.find(p => p.id === panelId)
+      if (!panel) return
+      from.panels = from.panels.filter(p => p.id !== panelId)
+      panel.xMm = xMm
+      panel.yMm = yMm
+      to.panels.push(panel)
+      this.touch()
+    },
     addPanelDefinition(def: PanelDefinition) {
       this.project.panelDefinitions.push(def)
       this.touch()

@@ -30,7 +30,7 @@ function formatPitch(def: PanelDefinition) {
         :key="def.id"
         draggable="true"
         class="cursor-grab rounded-md border border-default bg-default/40 px-2 py-1.5 text-xs hover:border-primary/40"
-        @dragstart="emit('drag', def.id)"
+        @dragstart="(e) => { e.dataTransfer?.setData('text/plain', def.id); e.dataTransfer!.effectAllowed = 'copy'; emit('drag', def.id) }"
       >
         <div class="flex items-start justify-between gap-1">
           <span class="font-medium leading-tight">{{ def.name }}</span>

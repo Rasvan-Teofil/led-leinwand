@@ -57,6 +57,27 @@ if (zoomBefore !== zoomAfter) {
 }
 await page.screenshot({ path: path.join(outDir, 'editor-after-panel-drag.png'), fullPage: true })
 
+const snapDrag = await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return null
+  const wall = api.project.walls.find(w => w.panels.length > 10)
+  const panel = wall?.panels[1]
+  if (!wall || !panel) return null
+  api.project.movePanel(wall.id, panel.id, 520, 0)
+  api.editor.setZoom(0.11)
+  api.editor.setPan(120, 100)
+  api.editor.selectPanel(wall.id, panel.id)
+  return api.getPanelClientCenter(wall.id, panel.id)
+})
+if (snapDrag) {
+  await page.mouse.move(snapDrag.x, snapDrag.y)
+  await page.mouse.down()
+  await page.mouse.move(snapDrag.x - 35, snapDrag.y, { steps: 6 })
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: path.join(outDir, 'editor-magnetic-snap-guides.png'), fullPage: true })
+  await page.mouse.up()
+}
+
 await page.getByRole('button', { name: 'Optimizer' }).click()
 await page.waitForTimeout(500)
 await page.screenshot({ path: path.join(outDir, 'optimizer.png'), fullPage: true })

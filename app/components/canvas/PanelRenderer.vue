@@ -3,6 +3,7 @@ import type Konva from 'konva'
 import { Rect } from 'vue-konva'
 import type { PanelInstance } from '#shared/types/panel'
 import { occupiedSizeMm } from '#shared/types/panel'
+import { useEditorStore } from '~/stores/editor'
 import { useProjectStore } from '~/stores/project'
 
 const props = defineProps<{
@@ -18,10 +19,13 @@ const emit = defineEmits<{
   select: [additive: boolean]
   dragStart: []
   dragMove: [xMm: number, yMm: number]
+  dragEnd: [xMm: number, yMm: number]
   contextMenu: [evt: MouseEvent]
 }>()
 
 const project = useProjectStore()
+const editor = useEditorStore()
+const shapeRef = ref<{ getNode: () => Konva.Rect } | null>(null)
 
 const def = computed(() => project.defsById.get(props.panel.panelDefinitionId))
 
@@ -61,13 +65,38 @@ function onDragStart() {
   emit('dragStart')
 }
 
-function onDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
-  if (!def.value) return
-  const node = e.target
+function localTopLeftFromNode(node: Konva.Node) {
+  if (!def.value) return null
   const occ = occupiedSizeMm(def.value, props.panel.rotation)
   const cx = node.x() / props.zoom
   const cy = node.y() / props.zoom
-  emit('dragMove', cx - occ.widthMm / 2, cy - occ.heightMm / 2)
+  return { xMm: cx - occ.widthMm / 2, yMm: cy - occ.heightMm / 2, occ }
+}
+
+function onDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+  const pos = localTopLeftFromNode(e.target)
+  if (!pos) return
+  emit('dragMove', pos.xMm, pos.yMm)
+}
+
+watch(
+  () => [props.panel.xMm, props.panel.yMm],
+  () => {
+    if (!editor.canvasDragging || !def.value) return
+    const node = shapeRef.value?.getNode()
+    if (!node) return
+    const occ = occupiedSizeMm(def.value, props.panel.rotation)
+    node.position({
+      x: props.panel.xMm * props.zoom + (occ.widthMm * props.zoom) / 2,
+      y: props.panel.yMm * props.zoom + (occ.heightMm * props.zoom) / 2
+    })
+  }
+)
+
+function onDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
+  const pos = localTopLeftFromNode(e.target)
+  if (!pos) return
+  emit('dragEnd', pos.xMm, pos.yMm)
 }
 
 function onContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
@@ -80,9 +109,11 @@ function onContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
 <template>
   <Rect
     v-if="def && panel.enabled && rectConfig"
+    ref="shapeRef"
     :config="rectConfig"
     @click="onClick"
     @dragstart="onDragStart"
+    @dragmove="onDragMove"
     @dragend="onDragEnd"
     @contextmenu="onContextMenu"
   />

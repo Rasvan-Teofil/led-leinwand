@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { SnapGuideLine } from '#shared/calculations/magnetic-snap'
 import type { EditorPreferences } from '#shared/types/project'
 import { DEFAULT_EDITOR_PREFERENCES } from '#shared/types/project'
 
@@ -34,7 +35,16 @@ export const useEditorStore = defineStore('editor', {
       panelId?: string
     } | null,
     canvasDragging: false,
-    pendingDeleteWallId: null as string | null
+    pendingDeleteWallId: null as string | null,
+    snapGuides: [] as SnapGuideLine[],
+    snapOverrideDisabled: false,
+    libraryDropPreview: null as {
+      wallId: string
+      localXMm: number
+      localYMm: number
+      widthMm: number
+      heightMm: number
+    } | null
   }),
   getters: {
     primaryWallId: s => s.selection.wallIds[0] ?? null,
@@ -80,6 +90,12 @@ export const useEditorStore = defineStore('editor', {
     },
     requestDeleteWall(wallId: string) {
       this.pendingDeleteWallId = wallId
+    },
+    setSnapGuides(guides: SnapGuideLine[]) {
+      this.snapGuides = guides
+    },
+    clearSnapGuides() {
+      this.snapGuides = []
     }
   }
 })

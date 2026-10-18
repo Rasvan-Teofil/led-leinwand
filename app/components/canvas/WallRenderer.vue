@@ -21,6 +21,7 @@ const emit = defineEmits<{
   selectPanel: [panelId: string, additive: boolean]
   panelDragStart: [panelId: string]
   panelDragMove: [panelId: string, xMm: number, yMm: number]
+  panelDragEnd: [panelId: string, xMm: number, yMm: number]
 }>()
 
 const project = useProjectStore()
@@ -190,6 +191,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       @select="(additive) => emit('selectPanel', panel.id, additive)"
       @drag-start="emit('panelDragStart', panel.id)"
       @drag-move="(x, y) => emit('panelDragMove', panel.id, x, y)"
+      @drag-end="(x, y) => emit('panelDragEnd', panel.id, x, y)"
       @context-menu="(evt) => onPanelContext(panel.id, evt)"
     />
   </Group>

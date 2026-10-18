@@ -6,6 +6,7 @@ import {
   type MagneticSnapResult,
   type SnapGuideLine
 } from '#shared/calculations/magnetic-snap'
+import { rectsOverlap } from '#shared/calculations/geometry'
 import { occupiedSizeMm } from '#shared/types/panel'
 import type { RotationDeg } from '#shared/types/panel'
 import { useEditorStore } from '~/stores/editor'
@@ -32,7 +33,8 @@ export function usePanelSnap() {
     worldYMm: number,
     widthMm: number,
     heightMm: number,
-    excludePanelId?: string
+    excludePanelId?: string,
+    fallbackWorld?: { xMm: number, yMm: number }
   ): MagneticSnapResult {
     const snapOn = editor.preferences.snapEnabled
       && !editor.snapOverrideDisabled
@@ -47,7 +49,9 @@ export function usePanelSnap() {
       magneticEnabled: snapOn,
       gridSnapEnabled: snapOn,
       neighbors: neighbors(),
-      excludePanelId
+      excludePanelId,
+      fallbackXMm: fallbackWorld?.xMm,
+      fallbackYMm: fallbackWorld?.yMm
     })
   }
 
@@ -57,7 +61,8 @@ export function usePanelSnap() {
     localYMm: number,
     panelDefId: string,
     rotation: RotationDeg,
-    excludePanelId?: string
+    excludePanelId?: string,
+    fallbackLocal?: { xMm: number, yMm: number }
   ): WallSnapPlacement {
     const wall = project.walls.find(w => w.id === wallId)
     const def = project.defsById.get(panelDefId)
@@ -65,12 +70,19 @@ export function usePanelSnap() {
       return { wallId, localXMm, localYMm, guides: [], mode: 'none' }
     }
     const size = occupiedSizeMm(def, rotation)
+    const fallbackWorld = fallbackLocal
+      ? {
+          xMm: wall.xMm + fallbackLocal.xMm,
+          yMm: wall.yMm + fallbackLocal.yMm
+        }
+      : undefined
     const result = snapWorldTopLeft(
       wall.xMm + localXMm,
       wall.yMm + localYMm,
       size.widthMm,
       size.heightMm,
-      excludePanelId
+      excludePanelId,
+      fallbackWorld
     )
     const targetWallId = result.referenceWallId ?? wallId
     const targetWall = project.walls.find(w => w.id === targetWallId) ?? wall
@@ -125,9 +137,30 @@ export function usePanelSnap() {
     }
   }
 
+  function isWorldTopLeftFree(
+    worldXMm: number,
+    worldYMm: number,
+    widthMm: number,
+    heightMm: number,
+    excludePanelId?: string
+  ): boolean {
+    const candidate = {
+      xMm: worldXMm,
+      yMm: worldYMm,
+      widthMm,
+      heightMm
+    }
+    for (const n of neighbors()) {
+      if (excludePanelId && n.panelId === excludePanelId) continue
+      if (rectsOverlap(candidate, n)) return false
+    }
+    return true
+  }
+
   return {
     snapOnWallLocal,
     snapFromPointerClient,
-    snapWorldTopLeft
+    snapWorldTopLeft,
+    isWorldTopLeftFree
   }
 }

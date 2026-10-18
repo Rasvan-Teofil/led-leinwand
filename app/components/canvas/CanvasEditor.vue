@@ -19,7 +19,7 @@ const project = useProjectStore()
 const editor = useEditorStore()
 const history = useHistoryStore()
 const { zoomAt, fitToContent, resetView } = useCanvasNavigation()
-const { snapOnWallLocal, snapFromPointerClient } = usePanelSnap()
+const { snapOnWallLocal, snapFromPointerClient, isWorldTopLeftFree } = usePanelSnap()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const isClient = ref(false)
@@ -31,7 +31,12 @@ const stageConfig = reactive({
 
 const isPanning = ref(false)
 const panStart = { x: 0, y: 0, panX: 0, panY: 0 }
-const dragPanelStart = ref<{ wallId: string, panelId: string, x: number, y: number } | null>(null)
+const dragPanelStart = ref<{
+  wallId: string
+  panelId: string
+  originLocalXMm: number
+  originLocalYMm: number
+} | null>(null)
 
 let resizeObserver: ResizeObserver | null = null
 
@@ -163,18 +168,20 @@ function onStageMouseMove(e: Konva.KonvaEventObject<MouseEvent>) {
 
 function onStageMouseUp() {
   isPanning.value = false
-  if (dragPanelStart.value) {
-    history.endDrag()
-    dragPanelStart.value = null
-    editor.canvasDragging = false
-    editor.clearSnapGuides()
-  }
 }
 
 function onPanelDragStart(wallId: string, panelId: string) {
+  const wall = project.walls.find(w => w.id === wallId)
+  const panel = wall?.panels.find(p => p.id === panelId)
+  if (!wall || !panel) return
   history.beginDrag()
   editor.canvasDragging = true
-  dragPanelStart.value = { wallId, panelId, x: 0, y: 0 }
+  dragPanelStart.value = {
+    wallId,
+    panelId,
+    originLocalXMm: panel.xMm,
+    originLocalYMm: panel.yMm
+  }
 }
 
 function applyPanelPosition(
@@ -183,23 +190,64 @@ function applyPanelPosition(
   localXMm: number,
   localYMm: number
 ) {
-  const wall = project.walls.find(w => w.id === fromWallId)
-  const panel = wall?.panels.find(p => p.id === panelId)
+  let wall = project.walls.find(w => w.id === fromWallId)
+  let panel = wall?.panels.find(p => p.id === panelId)
+  if (!panel) {
+    for (const w of project.walls) {
+      const p = w.panels.find(pp => pp.id === panelId)
+      if (p) {
+        wall = w
+        panel = p
+        break
+      }
+    }
+  }
   if (!wall || !panel) return
-  const snapped = snapOnWallLocal(
+  const origin = dragPanelStart.value?.panelId === panelId
+    ? {
+        xMm: dragPanelStart.value.originLocalXMm,
+        yMm: dragPanelStart.value.originLocalYMm
+      }
+    : { xMm: panel.xMm, yMm: panel.yMm }
+  const def = project.defsById.get(panel.panelDefinitionId)
+  if (!def) return
+  const size = occupiedSizeMm(def, panel.rotation)
+
+  let snapped = snapOnWallLocal(
     fromWallId,
     localXMm,
     localYMm,
     panel.panelDefinitionId,
     panel.rotation,
-    panelId
+    panelId,
+    origin
   )
+  const targetWall = project.walls.find(w => w.id === snapped.wallId) ?? wall
+  const worldX = targetWall.xMm + snapped.localXMm
+  const worldY = targetWall.yMm + snapped.localYMm
+  if (
+    !isWorldTopLeftFree(worldX, worldY, size.widthMm, size.heightMm, panelId)
+  ) {
+    snapped = {
+      wallId: fromWallId,
+      localXMm: origin.xMm,
+      localYMm: origin.yMm,
+      guides: [],
+      mode: 'none'
+    }
+  }
   editor.setSnapGuides(snapped.guides)
-  if (snapped.wallId === fromWallId) {
-    project.movePanel(fromWallId, panelId, snapped.localXMm, snapped.localYMm)
+
+  const currentHost = project.walls.find(w =>
+    w.panels.some(p => p.id === panelId)
+  )
+  const hostId = currentHost?.id ?? fromWallId
+
+  if (snapped.wallId === hostId) {
+    project.movePanel(hostId, panelId, snapped.localXMm, snapped.localYMm)
   } else {
     project.movePanelToWall(
-      fromWallId,
+      hostId,
       panelId,
       snapped.wallId,
       snapped.localXMm,
@@ -225,6 +273,9 @@ function onPanelDragEnd(
   yMm: number
 ) {
   applyPanelPosition(wallId, panelId, xMm, yMm)
+  history.endDrag()
+  dragPanelStart.value = null
+  editor.canvasDragging = false
   editor.clearSnapGuides()
 }
 

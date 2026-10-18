@@ -22,6 +22,8 @@ export interface MagneticSnapOptions {
   gridSnapEnabled: boolean
   neighbors: SnapNeighborRect[]
   excludePanelId?: string
+  fallbackXMm?: number
+  fallbackYMm?: number
 }
 
 export interface SnapGuideLine {
@@ -227,6 +229,21 @@ function magneticCandidates(
 /**
  * Resolve panel top-left (world mm) with magnetic snap to neighbors, then grid fallback.
  */
+function isFree(
+  xMm: number,
+  yMm: number,
+  widthMm: number,
+  heightMm: number,
+  neighbors: SnapNeighborRect[],
+  excludePanelId?: string
+): boolean {
+  return !overlapsNeighbors(
+    rectAt(xMm, yMm, widthMm, heightMm),
+    neighbors,
+    excludePanelId
+  )
+}
+
 export function resolveMagneticSnap(
   options: MagneticSnapOptions
 ): MagneticSnapResult {
@@ -241,8 +258,13 @@ export function resolveMagneticSnap(
     magneticEnabled,
     gridSnapEnabled,
     neighbors,
-    excludePanelId
+    excludePanelId,
+    fallbackXMm,
+    fallbackYMm
   } = options
+
+  const fallbackX = fallbackXMm ?? proposedXMm
+  const fallbackY = fallbackYMm ?? proposedYMm
 
   if (magneticEnabled && neighbors.length > 0) {
     const candidates = magneticCandidates(
@@ -256,8 +278,9 @@ export function resolveMagneticSnap(
     )
     for (const c of candidates) {
       if (c.distPx > thresholdPx) continue
-      const box = rectAt(c.xMm, c.yMm, widthMm, heightMm)
-      if (!overlapsNeighbors(box, neighbors, excludePanelId)) {
+      if (
+        isFree(c.xMm, c.yMm, widthMm, heightMm, neighbors, excludePanelId)
+      ) {
         return {
           xMm: c.xMm,
           yMm: c.yMm,
@@ -270,17 +293,32 @@ export function resolveMagneticSnap(
   }
 
   if (gridSnapEnabled && gridMm > 0) {
+    const gx = snapValue(proposedXMm, gridMm)
+    const gy = snapValue(proposedYMm, gridMm)
+    if (isFree(gx, gy, widthMm, heightMm, neighbors, excludePanelId)) {
+      return {
+        xMm: gx,
+        yMm: gy,
+        mode: 'grid',
+        guides: []
+      }
+    }
+  }
+
+  if (
+    isFree(proposedXMm, proposedYMm, widthMm, heightMm, neighbors, excludePanelId)
+  ) {
     return {
-      xMm: snapValue(proposedXMm, gridMm),
-      yMm: snapValue(proposedYMm, gridMm),
-      mode: 'grid',
+      xMm: proposedXMm,
+      yMm: proposedYMm,
+      mode: 'none',
       guides: []
     }
   }
 
   return {
-    xMm: proposedXMm,
-    yMm: proposedYMm,
+    xMm: fallbackX,
+    yMm: fallbackY,
     mode: 'none',
     guides: []
   }

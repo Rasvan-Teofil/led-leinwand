@@ -62,18 +62,20 @@ const snapDrag = await page.evaluate(() => {
   const api = window.__ledDesignerTest
   if (!api) return null
   const wall = api.project.walls.find(w => w.panels.length > 10)
-  const panel = wall?.panels[1]
+  const panel = wall?.panels.find(p => p.xMm === 500 && p.yMm === 0)
   if (!wall || !panel) return null
-  api.project.movePanel(wall.id, panel.id, 520, 0)
-  api.editor.setZoom(0.11)
+  api.editor.setZoom(0.1)
   api.editor.setPan(120, 100)
   api.editor.selectPanel(wall.id, panel.id)
-  return api.getPanelClientCenter(wall.id, panel.id)
+  const center = api.getPanelClientCenter(wall.id, panel.id)
+  if (!center) return null
+  return { ...center, zoom: api.editor.zoom }
 })
 if (snapDrag) {
+  const mmPerPx = 1 / snapDrag.zoom
   await page.mouse.move(snapDrag.x, snapDrag.y)
   await page.mouse.down()
-  await page.mouse.move(snapDrag.x - 35, snapDrag.y, { steps: 6 })
+  await page.mouse.move(snapDrag.x + 22 * mmPerPx, snapDrag.y, { steps: 8 })
   await page.waitForTimeout(500)
   await page.screenshot({ path: path.join(outDir, 'editor-magnetic-snap-guides.png'), fullPage: true })
   await page.mouse.up()

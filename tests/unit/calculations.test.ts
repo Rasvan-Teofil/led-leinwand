@@ -80,6 +80,23 @@ describe('LED wall calculations', () => {
     expect(res.valid).toBe(true)
   })
 
+  it('union area stays positive when panels overlap', () => {
+    const wall = wallFromGrid(2, 2, def)
+    const a = wall.panels[0]!
+    wall.panels.push({
+      ...a,
+      id: 'overlap',
+      xMm: a.xMm + 100,
+      yMm: a.yMm + 100
+    })
+    const defsById = new Map(defs.map(d => [d.id, d]))
+    const area = activeAreaMm2(wall, defsById)
+    expect(area).toBeGreaterThan(0)
+    expect(area).toBeLessThanOrEqual(4 * 500 * 500)
+    const dims = getWallDimensions(wall, defs)
+    expect(dims.activeAreaM2).toBeGreaterThan(0)
+  })
+
   it('removing a corner panel reduces active area', () => {
     const wall = wallFromGrid(3, 3, def)
     const before = activeAreaMm2(

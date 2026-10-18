@@ -68,6 +68,27 @@ describe('resolveMagneticSnap', () => {
     expect(result.yMm).toBe(0)
   })
 
+  it('reverts to fallback when proposed and grid would overlap', () => {
+    const neighbors = [neighbor('a', 0, 0, 500, 500)]
+    const result = resolveMagneticSnap({
+      proposedXMm: 20,
+      proposedYMm: 0,
+      widthMm: 500,
+      heightMm: 500,
+      zoom: 0.1,
+      thresholdPx: 12,
+      gridMm: 50,
+      magneticEnabled: true,
+      gridSnapEnabled: true,
+      neighbors,
+      excludePanelId: 'moving',
+      fallbackXMm: 500,
+      fallbackYMm: 0
+    })
+    expect(result.xMm).toBe(500)
+    expect(result.yMm).toBe(0)
+  })
+
   it('falls back to grid when no magnetic candidate is within threshold', () => {
     const result = resolveMagneticSnap({
       proposedXMm: 123,

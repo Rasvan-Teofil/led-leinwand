@@ -122,23 +122,70 @@ export function detectOverlaps(
   return pairs
 }
 
+function mergeIntervals(intervals: Array<[number, number]>): number {
+  if (intervals.length === 0) return 0
+  const sorted = [...intervals].sort((a, b) => a[0] - b[0])
+  let length = 0
+  let curStart = sorted[0]![0]
+  let curEnd = sorted[0]![1]
+  for (let i = 1; i < sorted.length; i++) {
+    const [s, e] = sorted[i]!
+    if (s <= curEnd) {
+      curEnd = Math.max(curEnd, e)
+    } else {
+      length += curEnd - curStart
+      curStart = s
+      curEnd = e
+    }
+  }
+  length += curEnd - curStart
+  return length
+}
+
+/** Union area of axis-aligned rectangles (mm²), overlaps counted once. */
+export function unionAreaMm2FromRects(rects: RectMm[]): number {
+  if (rects.length === 0) return 0
+  const yEdges = new Set<number>()
+  for (const r of rects) {
+    yEdges.add(r.yMm)
+    yEdges.add(r.yMm + r.heightMm)
+  }
+  const ys = [...yEdges].sort((a, b) => a - b)
+  let area = 0
+  for (let i = 0; i < ys.length - 1; i++) {
+    const y0 = ys[i]!
+    const y1 = ys[i + 1]!
+    const bandH = y1 - y0
+    if (bandH <= 0) continue
+    const intervals: Array<[number, number]> = []
+    for (const r of rects) {
+      if (r.yMm < y1 && r.yMm + r.heightMm > y0) {
+        intervals.push([r.xMm, r.xMm + r.widthMm])
+      }
+    }
+    area += bandH * mergeIntervals(intervals)
+  }
+  return area
+}
+
 export function activeAreaMm2(
   wall: LEDWall,
   defsById: Map<string, PanelDefinition>
 ): number {
-  const overlaps = detectOverlaps(wall, defsById)
-  if (overlaps.length > 0) {
-    return 0
-  }
-  let sum = 0
+  const rects: RectMm[] = []
   for (const panel of wall.panels) {
     if (!panel.enabled) continue
     const def = defsById.get(panel.panelDefinitionId)
     if (!def) continue
     const { widthMm, heightMm } = occupiedSizeMm(def, panel.rotation)
-    sum += widthMm * heightMm
+    rects.push({
+      xMm: panel.xMm,
+      yMm: panel.yMm,
+      widthMm,
+      heightMm
+    })
   }
-  return sum
+  return unionAreaMm2FromRects(rects)
 }
 
 export function mm2ToM2(mm2: number): number {

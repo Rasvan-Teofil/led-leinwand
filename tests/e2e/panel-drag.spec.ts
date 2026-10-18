@@ -15,7 +15,8 @@ test.describe('Panel drag preserves editor state', () => {
       if (!api) throw new Error('test hooks missing')
       const wall = api.project.walls.find(w => w.panels.length > 10)
       if (!wall) throw new Error('demo wall missing')
-      const panel = wall.panels[0]!
+      const panel = wall.panels.find(p => p.xMm === 500 && p.yMm === 0)!
+      if (!panel) throw new Error('panel at 500,0 missing')
       api.editor.setZoom(0.12)
       api.editor.setPan(140, 120)
       api.editor.selectPanel(wall.id, panel.id)
@@ -44,9 +45,10 @@ test.describe('Panel drag preserves editor state', () => {
       }
     }, dragTarget.panelId)
 
+    const mmPerPx = 1 / 0.12
     await page.mouse.move(dragTarget.centerX, dragTarget.centerY)
     await page.mouse.down()
-    await page.mouse.move(dragTarget.centerX + 80, dragTarget.centerY + 40, { steps: 8 })
+    await page.mouse.move(dragTarget.centerX + 500 * mmPerPx, dragTarget.centerY, { steps: 10 })
     await page.mouse.up()
     await page.waitForTimeout(300)
 

@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nuxtjs"
 }

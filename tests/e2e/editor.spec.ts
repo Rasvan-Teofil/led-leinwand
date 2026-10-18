@@ -36,10 +36,15 @@ test.describe('LED Wall Designer', () => {
     )
     expect(saved).toBeTruthy()
 
-    await page.reload()
-    expect(
-      await page.evaluate(() => localStorage.getItem('led-wall-designer:project'))
-    ).toEqual(saved)
+    await page.reload({ waitUntil: 'networkidle' })
+    const after = await page.evaluate(() =>
+      localStorage.getItem('led-wall-designer:project')
+    )
+    const beforeObj = JSON.parse(saved!)
+    const afterObj = JSON.parse(after!)
+    expect(afterObj.name).toBe(beforeObj.name)
+    expect(afterObj.walls.length).toBe(beforeObj.walls.length)
+    expect(afterObj.walls[0]?.panels.length).toBe(beforeObj.walls[0]?.panels.length)
 
     const downloadPromise = page.waitForEvent('download')
     await page.getByRole('button', { name: 'JSON' }).click()

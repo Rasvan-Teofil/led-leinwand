@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { wallLocalBoundingBox } from '../../shared/calculations/geometry'
 import {
   analyzeResolutionMask,
   computeContentFrameLedPx
@@ -83,5 +84,24 @@ describe('resolution mask', () => {
     const frame = computeContentFrameLedPx(1024, 640, 1920, 1080, 'contain')
     expect(Math.round(frame.width)).toBe(1024)
     expect(Math.round(frame.height)).toBe(576)
+  })
+
+  it('verschnitt rects stay within panel footprints', () => {
+    const wall = buildJinyuanWall()
+    const defs = clonePresetsForProject()
+    const res = analyzeResolutionMask(wall, defs, 0, {
+      enabled: true,
+      preset: 'fullHd',
+      fitMode: 'contain'
+    })!
+    const bbox = wallLocalBoundingBox(wall, new Map(defs.map(d => [d.id, d])))!
+    for (const r of res.verschnittRectsMm) {
+      expect(r.xMm).toBeGreaterThanOrEqual(bbox.xMm - 0.01)
+      expect(r.yMm).toBeGreaterThanOrEqual(bbox.yMm - 0.01)
+      expect(r.xMm + r.widthMm).toBeLessThanOrEqual(bbox.xMm + bbox.widthMm + 0.01)
+      expect(r.yMm + r.heightMm).toBeLessThanOrEqual(bbox.yMm + bbox.heightMm + 0.01)
+    }
+    expect(res.verschnittLabel).toContain('Verschnitt')
+    expect(res.verschnittLabel).toContain('10 %')
   })
 })

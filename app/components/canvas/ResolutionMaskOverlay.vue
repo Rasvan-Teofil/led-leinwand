@@ -25,7 +25,6 @@ const dragStart = ref<{ x: number, y: number, ox: number, oy: number } | null>(
 
 const z = computed(() => props.zoom)
 const raster = computed(() => props.analysis.ledRaster)
-
 const ledMm = computed(() => props.analysis.ledBoundsMm)
 
 const contentScreen = computed(() => {
@@ -38,21 +37,38 @@ const contentScreen = computed(() => {
   }
 })
 
-const hatchLines = computed(() => {
+function hatchLinesLocal(w: number, h: number, step = 9): number[][] {
   const lines: number[][] = []
-  const step = 12
-  for (const band of props.analysis.unusedLedRectsMm) {
-    const x = band.xMm * z.value
-    const y = band.yMm * z.value
-    const w = band.widthMm * z.value
-    const h = band.heightMm * z.value
-    const maxLen = Math.hypot(w, h)
-    for (let d = -maxLen; d < maxLen; d += step) {
-      lines.push([x + d, y, x + d + h, y + h])
-      lines.push([x + w + d, y, x + w + d + h, y + h])
-    }
+  for (let i = -h; i < w + h; i += step) {
+    lines.push([i, 0, i + h, h])
   }
   return lines
+}
+
+const verschnittLayers = computed(() => {
+  const rects = props.analysis.verschnittRectsMm
+  let labelIdx = 0
+  let maxArea = 0
+  rects.forEach((r, i) => {
+    const a = r.widthMm * r.heightMm
+    if (a > maxArea) {
+      maxArea = a
+      labelIdx = i
+    }
+  })
+  return rects.map((band, i) => {
+    const w = band.widthMm * z.value
+    const h = band.heightMm * z.value
+    return {
+      band,
+      x: band.xMm * z.value,
+      y: band.yMm * z.value,
+      w,
+      h,
+      hatch: hatchLinesLocal(w, h),
+      showLabel: i === labelIdx
+    }
+  })
 })
 
 const cropOutline = computed(() => {
@@ -85,7 +101,8 @@ const rulerText = computed(() => {
   const r = props.analysis.rulerLabels
   return {
     h: `${formatIntegerDe(r.contentWidthPx)} px · ${formatMmDe(r.contentWidthMm)}`,
-    v: `${formatIntegerDe(r.contentHeightPx)} px · ${formatMmDe(r.contentHeightMm)}`
+    vPx: `${formatIntegerDe(r.contentHeightPx)} px`,
+    vMm: formatMmDe(r.contentHeightMm)
   }
 })
 
@@ -141,28 +158,51 @@ watch(
 
 <template>
   <Group :config="{ listening: true }">
-    <Rect
-      v-for="(band, i) in analysis.unusedLedRectsMm"
-      :key="`band-${i}`"
+    <Group
+      v-for="(layer, i) in verschnittLayers"
+      :key="`vs-${i}`"
       :config="{
-        x: band.xMm * zoom,
-        y: band.yMm * zoom,
-        width: band.widthMm * zoom,
-        height: band.heightMm * zoom,
-        fill: 'rgba(255,255,255,0.06)',
-        listening: false
+        x: layer.x,
+        y: layer.y,
+        clip: { x: 0, y: 0, width: layer.w, height: layer.h }
       }"
-    />
-    <Line
-      v-for="(pts, i) in hatchLines"
-      :key="`hatch-${i}`"
-      :config="{
-        points: pts,
-        stroke: 'rgba(255,255,255,0.18)',
-        strokeWidth: 1,
-        listening: false
-      }"
-    />
+    >
+      <Rect
+        :config="{
+          x: 0,
+          y: 0,
+          width: layer.w,
+          height: layer.h,
+          fill: 'rgba(0,0,0,0.42)',
+          listening: false
+        }"
+      />
+      <Line
+        v-for="(pts, hi) in layer.hatch"
+        :key="`h-${i}-${hi}`"
+        :config="{
+          points: pts,
+          stroke: 'rgba(255,255,255,0.22)',
+          strokeWidth: 1,
+          listening: false
+        }"
+      />
+      <Text
+        v-if="layer.showLabel"
+        :config="{
+          x: 0,
+          y: layer.h / 2 - 8,
+          width: layer.w,
+          align: 'center',
+          text: analysis.verschnittLabel,
+          fontSize: 11,
+          fontStyle: 'bold',
+          fill: '#ffffff',
+          listening: false
+        }"
+      />
+    </Group>
+
     <Rect
       v-if="cropOutline"
       :config="{
@@ -177,6 +217,7 @@ watch(
         listening: false
       }"
     />
+
     <Group
       ref="groupRef"
       :config="{
@@ -197,52 +238,49 @@ watch(
           height: contentScreen.h,
           stroke: '#ffffff',
           strokeWidth: 2,
-          fill: 'rgba(255,255,255,0.04)',
-          dash: [4, 3],
-          strokeScaleEnabled: false
-        }"
-      />
-      <Line
-        :config="{
-          points: [0, -14, contentScreen.w, -14],
-          stroke: '#d4d4d4',
-          strokeWidth: 1,
-          listening: false
-        }"
-      />
-      <Line
-        :config="{
-          points: [-14, 0, -14, contentScreen.h],
-          stroke: '#d4d4d4',
-          strokeWidth: 1,
+          fill: 'rgba(255,255,255,0.02)',
+          strokeScaleEnabled: false,
           listening: false
         }"
       />
       <Text
         :config="{
-          x: contentScreen.w / 2 - 70,
-          y: -28,
-          width: 140,
+          x: 8,
+          y: 6,
+          width: contentScreen.w - 16,
           align: 'center',
           text: rulerText.h,
           fontSize: 10,
-          fill: '#d4d4d4',
+          fill: '#f5f5f5',
           listening: false
         }"
       />
       <Text
         :config="{
-          x: -148,
-          y: contentScreen.h / 2 - 6,
-          width: 140,
+          x: contentScreen.w - 72,
+          y: contentScreen.h - 36,
+          width: 64,
           align: 'right',
-          text: rulerText.v,
+          text: rulerText.vPx,
+          fontSize: 10,
+          fill: '#f5f5f5',
+          listening: false
+        }"
+      />
+      <Text
+        :config="{
+          x: contentScreen.w - 72,
+          y: contentScreen.h - 22,
+          width: 64,
+          align: 'right',
+          text: rulerText.vMm,
           fontSize: 10,
           fill: '#d4d4d4',
           listening: false
         }"
       />
     </Group>
+
     <Rect
       :config="{
         x: ledMm.xMm * zoom,

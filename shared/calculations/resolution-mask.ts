@@ -1,5 +1,5 @@
 import type { PanelDefinition } from '../types/panel'
-import { pitchXMm, pitchYMm } from '../types/panel'
+import { occupiedSizeMm, pitchXMm, pitchYMm } from '../types/panel'
 import type { LEDWall } from '../types/wall'
 import { wallLocalBoundingBox } from './geometry'
 import { analyzeNativeResolution } from './resolution'
@@ -69,7 +69,10 @@ export interface ResolutionMaskAnalysis {
   contentLedPxFull: LedRasterRectPx
   contentLedMm: LedRasterRectMm
   ledBoundsMm: LedRasterRectMm
-  /** Regions on the wall (LED) outside content but still active pixels — Verschnitt. */
+  /** Verschnitt: active panel area outside the content frame (wall-local mm). */
+  verschnittRectsMm: LedRasterRectMm[]
+  verschnittLabel: string
+  /** @deprecated Use verschnittRectsMm */
   unusedLedRectsMm: LedRasterRectMm[]
   contentAreaPx: number
   contentAreaMm2: number
@@ -281,47 +284,105 @@ function countActiveOutsideRect(
   return raster.activePixelCount - countActiveInRect(raster, inner)
 }
 
-/** Axis-aligned unused bands (letterbox) for simple masking UI. */
-function unusedBandsMm(
-  raster: WallLedRaster,
-  content: LedRasterRectPx
+function intersectMm(
+  a: LedRasterRectMm,
+  b: LedRasterRectMm
+): LedRasterRectMm | null {
+  const x1 = Math.max(a.xMm, b.xMm)
+  const y1 = Math.max(a.yMm, b.yMm)
+  const x2 = Math.min(a.xMm + a.widthMm, b.xMm + b.widthMm)
+  const y2 = Math.min(a.yMm + a.heightMm, b.yMm + b.heightMm)
+  if (x2 <= x1 + 0.01 || y2 <= y1 + 0.01) return null
+  return { xMm: x1, yMm: y1, widthMm: x2 - x1, heightMm: y2 - y1 }
+}
+
+function subtractPanelFromContentMm(
+  panel: LedRasterRectMm,
+  content: LedRasterRectMm
 ): LedRasterRectMm[] {
-  const led: LedRasterRectPx = {
-    x: 0,
-    y: 0,
-    width: raster.widthPx,
-    height: raster.heightPx
+  const hit = intersectMm(panel, content)
+  if (!hit) return [panel]
+  const out: LedRasterRectMm[] = []
+  const px = panel.xMm
+  const py = panel.yMm
+  const pw = panel.widthMm
+  const ph = panel.heightMm
+  const cx = hit.xMm
+  const cy = hit.yMm
+  const cw = hit.widthMm
+  const ch = hit.heightMm
+  if (py < cy - 0.01) {
+    out.push({
+      xMm: px,
+      yMm: py,
+      widthMm: pw,
+      heightMm: cy - py
+    })
   }
-  const bands: LedRasterRectMm[] = []
-  const top = intersectRectsPx(led, {
-    x: 0,
-    y: 0,
-    width: raster.widthPx,
-    height: content.y
-  })
-  if (top && top.height > 0.01) bands.push(pxToMm(raster, top))
-  const bottom = intersectRectsPx(led, {
-    x: 0,
-    y: content.y + content.height,
-    width: raster.widthPx,
-    height: raster.heightPx - (content.y + content.height)
-  })
-  if (bottom && bottom.height > 0.01) bands.push(pxToMm(raster, bottom))
-  const left = intersectRectsPx(led, {
-    x: 0,
-    y: content.y,
-    width: content.x,
-    height: content.height
-  })
-  if (left && left.width > 0.01) bands.push(pxToMm(raster, left))
-  const right = intersectRectsPx(led, {
-    x: content.x + content.width,
-    y: content.y,
-    width: raster.widthPx - (content.x + content.width),
-    height: content.height
-  })
-  if (right && right.width > 0.01) bands.push(pxToMm(raster, right))
-  return bands
+  if (py + ph > cy + ch + 0.01) {
+    out.push({
+      xMm: px,
+      yMm: cy + ch,
+      widthMm: pw,
+      heightMm: py + ph - (cy + ch)
+    })
+  }
+  const midY = Math.max(py, cy)
+  const midH = Math.min(py + ph, cy + ch) - midY
+  if (midH > 0.01) {
+    if (px < cx - 0.01) {
+      out.push({
+        xMm: px,
+        yMm: midY,
+        widthMm: cx - px,
+        heightMm: midH
+      })
+    }
+    if (px + pw > cx + cw + 0.01) {
+      out.push({
+        xMm: cx + cw,
+        yMm: midY,
+        widthMm: px + pw - (cx + cw),
+        heightMm: midH
+      })
+    }
+  }
+  return out.filter(r => r.widthMm > 0.5 && r.heightMm > 0.5)
+}
+
+/** Clip Verschnitt to enabled panel footprints (irregular walls). */
+export function computeVerschnittRectsMm(
+  wall: LEDWall,
+  defs: PanelDefinition[],
+  contentLedMm: LedRasterRectMm
+): LedRasterRectMm[] {
+  const defsById = new Map(defs.map(d => [d.id, d]))
+  const rects: LedRasterRectMm[] = []
+  for (const panel of wall.panels) {
+    if (!panel.enabled || panel.rotation !== 0) continue
+    const def = defsById.get(panel.panelDefinitionId)
+    if (!def) continue
+    const size = occupiedSizeMm(def, panel.rotation)
+    const panelMm: LedRasterRectMm = {
+      xMm: panel.xMm,
+      yMm: panel.yMm,
+      widthMm: size.widthMm,
+      heightMm: size.heightMm
+    }
+    rects.push(...subtractPanelFromContentMm(panelMm, contentLedMm))
+  }
+  return rects
+}
+
+export function verschnittLabelText(
+  unusedLedPixels: number,
+  unusedLedPercent: number,
+  ledWidthPx: number
+): string {
+  const rowPx
+    = ledWidthPx > 0 ? Math.round(unusedLedPixels / ledWidthPx) : unusedLedPixels
+  const pct = unusedLedPercent.toFixed(0)
+  return `Verschnitt ${rowPx} px · ${pct} %`
 }
 
 export function analyzeResolutionMask(
@@ -387,7 +448,16 @@ export function analyzeResolutionMask(
     = source.widthPx > 0 ? contentLedPx.width / source.widthPx : 0
 
   const contentLedMm = pxToMm(raster, contentLedPx)
+  const contentOnWallMm = pxToMm(
+    raster,
+    onWall ?? { x: 0, y: 0, width: 0, height: 0 }
+  )
   const ledBoundsMm = pxToMm(raster, ledBoundsPx)
+  const verschnittRectsMm = computeVerschnittRectsMm(
+    wall,
+    defs,
+    contentOnWallMm
+  )
 
   return {
     comparable,
@@ -399,7 +469,13 @@ export function analyzeResolutionMask(
     contentLedPxFull,
     contentLedMm,
     ledBoundsMm,
-    unusedLedRectsMm: unusedBandsMm(raster, onWall ?? contentLedPx),
+    verschnittRectsMm,
+    verschnittLabel: verschnittLabelText(
+      unusedLedPixels,
+      unusedLedPercent,
+      raster.widthPx
+    ),
+    unusedLedRectsMm: verschnittRectsMm,
     contentAreaPx,
     contentAreaMm2,
     unusedLedPixels,

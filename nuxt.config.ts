@@ -22,6 +22,12 @@ export default defineNuxtConfig({
     preset: 'vercel'
   },
 
+  vite: {
+    optimizeDeps: {
+      include: ['konva', 'vue-konva', 'jspdf', 'zod']
+    }
+  },
+
   typescript: {
     strict: true
   },

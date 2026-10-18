@@ -26,7 +26,13 @@ export const useEditorStore = defineStore('editor', {
     previewShowPixelGrid: false,
     previewFitMode: 'contain' as 'contain' | 'cover' | 'stretch',
     optimizerWallTargetId: null as string | null,
-    mobileReadOnly: false
+    mobileReadOnly: false,
+    contextMenu: null as {
+      x: number
+      y: number
+      wallId: string
+      panelId?: string
+    } | null
   }),
   getters: {
     primaryWallId: s => s.selection.wallIds[0] ?? null,

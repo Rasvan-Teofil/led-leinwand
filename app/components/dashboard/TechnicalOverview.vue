@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { REFERENCE_KIND_LABELS_DE, WARNING_LABELS_DE, formatAspectRatio } from '#shared/i18n/messages-de'
 import { useProjectMetrics, useWallMetrics } from '~/composables/useWallMetrics'
 import { useEditorStore } from '~/stores/editor'
 import { useProjectStore } from '~/stores/project'
@@ -52,7 +53,14 @@ const wallMetrics = useWallMetrics(() => activeWall.value)
           >kein einheitliches Raster</span>
         </div>
         <div v-if="wallMetrics.physicalAspect">
-          Phys. AR: {{ wallMetrics.physicalAspect.toFixed(3) }}
+          Phys. AR: {{ formatAspectRatio(wallMetrics.physicalAspect) }}
+          <span
+            v-if="wallMetrics.resolution.valid && wallMetrics.resolution.resolutionY > 0"
+            class="text-muted"
+          >
+            · Pixel-AR:
+            {{ formatAspectRatio(wallMetrics.resolution.resolutionX / wallMetrics.resolution.resolutionY) }}
+          </span>
         </div>
         <ul
           v-if="wallMetrics.resolution.warnings.length"
@@ -62,7 +70,7 @@ const wallMetrics = useWallMetrics(() => activeWall.value)
             v-for="(w, i) in wallMetrics.resolution.warnings"
             :key="i"
           >
-            {{ w }}
+            {{ WARNING_LABELS_DE[w] ?? w }}
           </li>
         </ul>
         <ul class="mt-1 text-muted">
@@ -70,7 +78,7 @@ const wallMetrics = useWallMetrics(() => activeWall.value)
             v-for="ref in wallMetrics.references"
             :key="ref.label"
           >
-            {{ ref.label }}: {{ ref.kind }}
+            {{ ref.label }}: {{ REFERENCE_KIND_LABELS_DE[ref.kind] ?? ref.kind }}
           </li>
         </ul>
       </div>

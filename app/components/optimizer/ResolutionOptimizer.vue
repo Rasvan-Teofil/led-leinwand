@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { OptimizerRankMode } from '#shared/calculations/optimizer'
 import { runOptimizer } from '#shared/calculations/optimizer'
+import { formatAspectRatio, parseAspectRatioInput } from '#shared/i18n/messages-de'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -10,15 +12,46 @@ const history = useHistoryStore()
 
 const maxWidthM = ref(10)
 const maxHeightM = ref(4)
-const aspect = ref(16 / 9)
+const aspectPreset = ref('16:9')
+const aspectCustom = ref('')
+const rankMode = ref<OptimizerRankMode>('best_aspect')
 const maxPanels = ref(80)
 
+const rankModes: Array<{ label: string, value: OptimizerRankMode }> = [
+  { label: 'Bestes Seitenverhältnis', value: 'best_aspect' },
+  { label: 'Höchste Auflösung', value: 'highest_resolution' },
+  { label: 'Minimale Panelanzahl', value: 'min_panels' },
+  { label: 'Nächste Full HD', value: 'closest_fhd' },
+  { label: 'Maximale Fläche', value: 'max_area' },
+  { label: 'Niedrigste Kosten', value: 'lowest_cost' }
+]
+
+const aspectPresets = ['16:9', '16:10', '4:3', '21:9', '1:1', 'custom']
+
+const desiredAspect = computed(() => {
+  if (aspectPreset.value === 'custom') {
+    return parseAspectRatioInput(aspectCustom.value) ?? 16 / 9
+  }
+  return parseAspectRatioInput(aspectPreset.value) ?? 16 / 9
+})
+
+const panelDefs = computed(() => {
+  const jinyuan = project.panelDefinitions.filter(d =>
+    d.id.startsWith('jinyuan-')
+  )
+  const rest = project.panelDefinitions.filter(d =>
+    !d.id.startsWith('jinyuan-')
+  )
+  return [...jinyuan, ...rest]
+})
+
 const candidates = computed(() =>
-  runOptimizer(project.panelDefinitions, {
+  runOptimizer(panelDefs.value, {
     maxWidthMm: maxWidthM.value * 1000,
     maxHeightMm: maxHeightM.value * 1000,
-    desiredAspect: aspect.value,
-    maxPanels: maxPanels.value
+    desiredAspect: desiredAspect.value,
+    maxPanels: maxPanels.value,
+    rankMode: rankMode.value
   }).slice(0, 12)
 )
 
@@ -42,7 +75,7 @@ function applyCandidate(cols: number, rows: number, defId: string, createNew: bo
     <h2 class="mb-3 text-lg font-semibold">
       Auflösungs-Optimizer
     </h2>
-    <div class="mb-4 grid max-w-xl grid-cols-2 gap-3">
+    <div class="mb-4 grid max-w-3xl grid-cols-2 gap-3 lg:grid-cols-3">
       <UFormField label="Max. Breite (m)">
         <UInput
           v-model.number="maxWidthM"
@@ -58,10 +91,32 @@ function applyCandidate(cols: number, rows: number, defId: string, createNew: bo
         />
       </UFormField>
       <UFormField label="Ziel-Seitenverhältnis">
+        <USelect
+          v-model="aspectPreset"
+          :items="aspectPresets.map(p => ({ label: p === 'custom' ? 'Eigene Eingabe' : p, value: p }))"
+        />
+      </UFormField>
+      <UFormField
+        v-if="aspectPreset === 'custom'"
+        label="Eigene Eingabe (z. B. 16:9)"
+      >
         <UInput
-          v-model.number="aspect"
-          type="number"
-          step="0.01"
+          v-model="aspectCustom"
+          placeholder="16:9"
+        />
+      </UFormField>
+      <UFormField
+        v-else
+        label="Aktuelles Ziel"
+      >
+        <p class="pt-1 text-muted">
+          {{ formatAspectRatio(desiredAspect) }}
+        </p>
+      </UFormField>
+      <UFormField label="Sortierung">
+        <USelect
+          v-model="rankMode"
+          :items="rankModes"
         />
       </UFormField>
       <UFormField label="Max. Panels">
@@ -87,7 +142,7 @@ function applyCandidate(cols: number, rows: number, defId: string, createNew: bo
           {{ c.nativeResolutionX }}×{{ c.nativeResolutionY }} px
         </div>
         <div class="text-muted">
-          AR Δ {{ (c.aspectDeviation * 100).toFixed(1) }}%
+          AR {{ formatAspectRatio(c.physicalAspect) }} · Abweichung {{ (c.aspectDeviation * 100).toFixed(1) }}%
         </div>
         <div class="mt-2 flex gap-1">
           <UButton

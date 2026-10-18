@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RotationDeg } from '#shared/types/panel'
 import { pitchXMm, pitchYMm } from '#shared/types/panel'
+import { WARNING_LABELS_DE } from '#shared/i18n/messages-de'
 import { useWallMetrics } from '~/composables/useWallMetrics'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
@@ -109,12 +110,17 @@ function deletePanel() {
             >n/a</span>
           </dd>
         </div>
-        <div
+        <ul
           v-if="metrics.resolution.warnings.length"
-          class="text-warning"
+          class="list-disc pl-4 text-warning"
         >
-          {{ metrics.resolution.warnings.join(', ') }}
-        </div>
+          <li
+            v-for="(w, i) in metrics.resolution.warnings"
+            :key="i"
+          >
+            {{ WARNING_LABELS_DE[w] ?? w }}
+          </li>
+        </ul>
       </dl>
     </template>
 

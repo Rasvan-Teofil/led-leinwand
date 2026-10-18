@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CanvasEditor from '~/components/canvas/CanvasEditor.vue'
 import { useKeyboardShortcuts } from '~/composables/useKeyboardShortcuts'
 import { useProjectStore } from '~/stores/project'
 import { useEditorStore } from '~/stores/editor'
@@ -12,19 +13,34 @@ const { onKeyDown, onKeyUp } = useKeyboardShortcuts()
 
 const canvasRef = ref<{ fitAll: () => void } | null>(null)
 
+function ensureDemoContent() {
+  if (project.walls.length === 0) {
+    seedDemoProject()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
-  if (!persistence.loadAutosave()) {
+  const loaded = persistence.loadAutosave()
+  if (!loaded) {
     seedDemoProject()
+  } else {
+    ensureDemoContent()
   }
-  nextTick(() => canvasRef.value?.fitAll?.())
+  if (project.walls[0]) {
+    editor.selectWall(project.walls[0].id)
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
 })
+
+function onCanvasReady() {
+  canvasRef.value?.fitAll()
+}
 
 function seedDemoProject() {
   project.newProject('Demo LED Projekt')
@@ -38,9 +54,10 @@ function seedDemoProject() {
   if (rectId) {
     project.updateWall(rectId, { xMm: 0, yMm: 0 })
     for (let col = 0; col < 8; col++) {
-      project.addPanel(rectId, jinyuan500.id, col * 500, 0)
-      project.addPanel(rectId, jinyuan1000.id, col * 500, 500)
-      project.addPanel(rectId, jinyuan1000.id, col * 500, 1500)
+      const x = col * 500
+      project.addPanel(rectId, jinyuan1000.id, x, 0)
+      project.addPanel(rectId, jinyuan1000.id, x, 1000)
+      project.addPanel(rectId, jinyuan500.id, x, 2000)
     }
   }
 
@@ -74,9 +91,10 @@ useHead({ title: 'LED Wall Designer' })
       <LayoutLeftSidebar />
       <main class="flex min-w-0 flex-1 flex-col">
         <div class="relative min-h-0 flex-1">
-          <CanvasCanvasEditor
+          <CanvasEditor
             v-if="editor.activeView === 'editor'"
             ref="canvasRef"
+            @ready="onCanvasReady"
           />
           <OptimizerResolutionOptimizer v-else-if="editor.activeView === 'optimizer'" />
           <PreviewPresentationPreview v-else-if="editor.activeView === 'preview'" />

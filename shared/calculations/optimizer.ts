@@ -1,7 +1,16 @@
 import type { PanelDefinition } from '../types/panel'
 import { pitchXMm } from '../types/panel'
+import { aspectDeviation } from './aspect'
 import { rectangularWallSizeMm } from './dimensions'
 import { mm2ToM2 } from './geometry'
+
+export type OptimizerRankMode
+  = | 'best_aspect'
+    | 'highest_resolution'
+    | 'min_panels'
+    | 'closest_fhd'
+    | 'max_area'
+    | 'lowest_cost'
 
 export interface OptimizerConstraints {
   maxWidthMm: number
@@ -11,6 +20,7 @@ export interface OptimizerConstraints {
   minNativeHeight?: number
   preferredPanelDefinitionIds?: string[]
   maxPanels?: number
+  rankMode?: OptimizerRankMode
 }
 
 export interface OptimizerCandidate {
@@ -27,15 +37,45 @@ export interface OptimizerCandidate {
   pitchMm: number
   physicalAspect: number
   aspectDeviation: number
-  score: number
+  fhdDistance: number
   estimatedCost?: number
   benefits: string[]
   tradeoffs: string[]
 }
 
-function aspectDeviation(actual: number, desired?: number): number {
-  if (!desired || desired <= 0) return 0
-  return Math.abs(actual - desired) / desired
+const FHD_PIXELS = 1920 * 1080
+
+function compareCandidates(
+  a: OptimizerCandidate,
+  b: OptimizerCandidate,
+  mode: OptimizerRankMode
+): number {
+  switch (mode) {
+    case 'best_aspect':
+      if (a.aspectDeviation !== b.aspectDeviation) {
+        return a.aspectDeviation - b.aspectDeviation
+      }
+      return b.totalPixels - a.totalPixels
+    case 'highest_resolution':
+      return b.totalPixels - a.totalPixels
+    case 'min_panels':
+      if (a.totalPanels !== b.totalPanels) return a.totalPanels - b.totalPanels
+      return a.aspectDeviation - b.aspectDeviation
+    case 'closest_fhd':
+      if (a.fhdDistance !== b.fhdDistance) return a.fhdDistance - b.fhdDistance
+      return a.aspectDeviation - b.aspectDeviation
+    case 'max_area':
+      if (a.areaM2 !== b.areaM2) return b.areaM2 - a.areaM2
+      return a.aspectDeviation - b.aspectDeviation
+    case 'lowest_cost': {
+      const ac = a.estimatedCost ?? Number.POSITIVE_INFINITY
+      const bc = b.estimatedCost ?? Number.POSITIVE_INFINITY
+      if (ac !== bc) return ac - bc
+      return a.aspectDeviation - b.aspectDeviation
+    }
+    default:
+      return 0
+  }
 }
 
 export function runOptimizer(
@@ -49,7 +89,8 @@ export function runOptimizer(
     minNativeWidth = 0,
     minNativeHeight = 0,
     preferredPanelDefinitionIds,
-    maxPanels = Infinity
+    maxPanels = Infinity,
+    rankMode = 'best_aspect'
   } = constraints
 
   const defs = preferredPanelDefinitionIds?.length
@@ -82,25 +123,17 @@ export function runOptimizer(
         const areaM2 = mm2ToM2(widthMm * heightMm)
         const totalPixels = nativeResolutionX * nativeResolutionY
         const pitchMm = pitchXMm(def)
-        const fhdPixels = 1920 * 1080
-        const fhdDistance = Math.abs(totalPixels - fhdPixels) / fhdPixels
-        let score = 0
-        score -= dev * 100
-        score += totalPixels / 10_000
-        score -= totalPanels * 0.5
-        score -= fhdDistance * 20
-        score += areaM2 * 2
+        const fhdDistance = Math.abs(totalPixels - FHD_PIXELS) / FHD_PIXELS
         const benefits: string[] = []
         const tradeoffs: string[] = []
-        if (dev < 0.02) benefits.push('Matches desired aspect closely')
-        if (totalPixels >= fhdPixels) benefits.push('Full HD pixel count or higher')
-        if (totalPanels <= 20) benefits.push('Moderate panel count')
-        if (dev > 0.1) tradeoffs.push('Aspect ratio deviates from target')
-        if (totalPanels > 50) tradeoffs.push('High panel count')
+        if (dev < 0.02) benefits.push('Nahe am Ziel-Seitenverhältnis')
+        if (totalPixels >= FHD_PIXELS) benefits.push('Full-HD-Pixelzahl oder höher')
+        if (totalPanels <= 20) benefits.push('Moderate Panelanzahl')
+        if (dev > 0.1) tradeoffs.push('Seitenverhältnis weicht ab')
+        if (totalPanels > 50) tradeoffs.push('Hohe Panelanzahl')
         let estimatedCost: number | undefined
         if (def.pricePerPanel != null) {
           estimatedCost = def.pricePerPanel * totalPanels
-          score -= estimatedCost / 10_000
         }
         candidates.push({
           panelDefinition: def,
@@ -116,7 +149,7 @@ export function runOptimizer(
           pitchMm,
           physicalAspect,
           aspectDeviation: dev,
-          score,
+          fhdDistance,
           estimatedCost,
           benefits,
           tradeoffs
@@ -126,6 +159,6 @@ export function runOptimizer(
   }
 
   return candidates
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => compareCandidates(a, b, rankMode))
     .slice(0, 50)
 }

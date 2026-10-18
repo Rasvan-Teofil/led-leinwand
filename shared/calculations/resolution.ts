@@ -1,6 +1,7 @@
 import type { PanelDefinition } from '../types/panel'
 import { occupiedResolution, pitchXMm, pitchYMm } from '../types/panel'
 import type { LEDWall } from '../types/wall'
+import { analyzeUniformPitchRaster } from './uniform-pitch-raster'
 
 export type ResolutionWarningCode
   = | 'mixed_pitch'
@@ -82,7 +83,11 @@ function panelsShareUniformGrid(
 }
 
 function pitchKey(def: PanelDefinition): string {
-  return `${pitchXMm(def).toFixed(6)}:${pitchYMm(def).toFixed(6)}:${def.widthMm}x${def.heightMm}`
+  return `${pitchXMm(def).toFixed(6)}:${pitchYMm(def).toFixed(6)}`
+}
+
+function pitchKeyWithSize(def: PanelDefinition): string {
+  return `${pitchKey(def)}:${def.widthMm}x${def.heightMm}`
 }
 
 export function analyzeNativeResolution(
@@ -112,7 +117,7 @@ export function analyzeNativeResolution(
   for (const panel of enabled) {
     const def = defsById.get(panel.panelDefinitionId)
     if (!def) continue
-    const key = pitchKey(def)
+    const key = pitchKeyWithSize(def)
     const res = occupiedResolution(def, panel.rotation)
     const px = res.resolutionX * res.resolutionY
     const existing = pitchGroupsMap.get(key)
@@ -131,13 +136,34 @@ export function analyzeNativeResolution(
   }
 
   const pitchGroups = [...pitchGroupsMap.values()]
-  if (pitchGroups.length > 1) {
+  const uniqueDefs = new Set(enabled.map(p => p.panelDefinitionId))
+
+  const uniformPitchKeys = new Set(
+    enabled.map((p) => {
+      const d = defsById.get(p.panelDefinitionId)
+      return d ? pitchKey(d) : ''
+    })
+  )
+  if (uniformPitchKeys.size > 1) {
     warnings.push('mixed_pitch')
   }
 
-  const uniqueDefs = new Set(enabled.map(p => p.panelDefinitionId))
-  if (uniqueDefs.size > 1 && pitchGroups.length === 1) {
-    warnings.push('mixed_panel_sizes')
+  const uniformRaster = analyzeUniformPitchRaster(wall, defsById)
+  if (uniformRaster) {
+    if (uniqueDefs.size > 1) {
+      warnings.push('mixed_panel_sizes')
+    }
+    const blocking = warnings.filter(w =>
+      w !== 'mixed_panel_sizes'
+    )
+    return {
+      valid: blocking.length === 0,
+      resolutionX: uniformRaster.resolutionX,
+      resolutionY: uniformRaster.resolutionY,
+      totalPixels: uniformRaster.resolutionX * uniformRaster.resolutionY,
+      warnings,
+      pitchGroups
+    }
   }
 
   const singleDefId = enabled[0]!.panelDefinitionId
@@ -171,6 +197,11 @@ export function analyzeNativeResolution(
     }
   }
 
+  if (uniformPitchKeys.size <= 1 && uniqueDefs.size > 1) {
+    warnings.push('gaps_in_grid')
+  } else if (uniformPitchKeys.size > 1) {
+    warnings.push('mixed_pitch')
+  }
   warnings.push('non_rectangular')
   const totalPixels = pitchGroups.reduce((s, g) => s + g.nativePixels, 0)
   return {

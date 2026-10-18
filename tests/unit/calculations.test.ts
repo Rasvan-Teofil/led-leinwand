@@ -256,4 +256,81 @@ describe('LED wall calculations', () => {
     const result = parseProjectJson(bad)
     expect(result.ok).toBe(false)
   })
+
+  it('Jinyuan 8-column wall: 1024x640 native, 10 m², uniform pitch raster', () => {
+    const presets = clonePresetsForProject()
+    const j500 = presets.find(d => d.id === 'jinyuan-p391-500x500')!
+    const j1000 = presets.find(d => d.id === 'jinyuan-p391-500x1000')!
+    const defs = [j500, j1000]
+    const wall: LEDWall = {
+      id: 'jinyuan',
+      name: 'Jinyuan',
+      xMm: 0,
+      yMm: 0,
+      visible: true,
+      locked: false,
+      panels: []
+    }
+    for (let col = 0; col < 8; col++) {
+      const x = col * 500
+      wall.panels.push(
+        {
+          id: `p-${col}-t1`,
+          panelDefinitionId: j1000.id,
+          xMm: x,
+          yMm: 0,
+          rotation: 0,
+          enabled: true
+        },
+        {
+          id: `p-${col}-t2`,
+          panelDefinitionId: j1000.id,
+          xMm: x,
+          yMm: 1000,
+          rotation: 0,
+          enabled: true
+        },
+        {
+          id: `p-${col}-b`,
+          panelDefinitionId: j500.id,
+          xMm: x,
+          yMm: 2000,
+          rotation: 0,
+          enabled: true
+        }
+      )
+    }
+    const dims = getWallDimensions(wall, defs)
+    expect(dims.bboxWidthMm).toBe(4000)
+    expect(dims.bboxHeightMm).toBe(2500)
+    expect(dims.activeAreaM2).toBeCloseTo(10, 5)
+    const res = analyzeNativeResolution(wall, defs, 0)
+    expect(res.resolutionX).toBe(1024)
+    expect(res.resolutionY).toBe(640)
+    expect(res.valid).toBe(true)
+    expect(res.warnings).not.toContain('mixed_pitch')
+    expect(res.warnings).not.toContain('non_rectangular')
+    const physAr = dims.bboxWidthMm / dims.bboxHeightMm
+    const pixAr = res.resolutionX / res.resolutionY
+    expect(physAr).toBeCloseTo(1.6, 5)
+    expect(pixAr).toBeCloseTo(1.6, 5)
+  })
+
+  it('optimizer best aspect ranks 16:9 candidates first', () => {
+    const presets = clonePresetsForProject()
+    const candidates = runOptimizer(presets, {
+      maxWidthMm: 10000,
+      maxHeightMm: 4000,
+      desiredAspect: 16 / 9,
+      rankMode: 'best_aspect',
+      maxPanels: 100
+    })
+    expect(candidates.length).toBeGreaterThan(0)
+    const top = candidates[0]!
+    expect(top.aspectDeviation).toBeLessThanOrEqual(candidates[candidates.length - 1]!.aspectDeviation)
+    const near169 = candidates.filter(c => c.aspectDeviation < 0.05)
+    if (near169.length) {
+      expect(top.aspectDeviation).toBeLessThan(0.1)
+    }
+  })
 })

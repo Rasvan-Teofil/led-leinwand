@@ -7,7 +7,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   use: {
     baseURL: 'http://127.0.0.1:3000',
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    viewport: { width: 1440, height: 900 }
   },
   webServer: {
     command: 'pnpm run dev --port 3000 --host 127.0.0.1',

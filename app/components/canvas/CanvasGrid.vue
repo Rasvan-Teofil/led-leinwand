@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Line } from 'vue-konva'
+
 const props = defineProps<{
   width: number
   height: number
@@ -26,12 +28,12 @@ const lines = computed(() => {
 </script>
 
 <template>
-  <v-line
+  <Line
     v-for="(line, i) in lines"
     :key="i"
     :config="{
       points: line.points,
-      stroke: '#1e293b',
+      stroke: '#243044',
       strokeWidth: 1,
       listening: false
     }"

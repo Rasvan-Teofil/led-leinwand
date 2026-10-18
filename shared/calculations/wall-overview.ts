@@ -8,7 +8,7 @@ import {
   formatPitchPairMm,
   formatResolutionPair
 } from '../format/de-de'
-import { getWallDimensions } from './dimensions'
+import { getWallDimensions, inferWallRasterLayout } from './dimensions'
 import { detectOverlaps } from './geometry'
 import {
   activePixelCountFromGroups,
@@ -33,12 +33,9 @@ export interface WallOverviewSummary {
 function inferWallLayoutLabel(wall: LEDWall): string {
   const enabled = wall.panels.filter(p => p.enabled)
   if (enabled.length === 0) return 'Keine Panels'
-  const xs = new Set(enabled.map(p => p.xMm))
-  const ys = new Set(enabled.map(p => p.yMm))
-  const cols = xs.size
-  const rows = ys.size
-  if (cols > 0 && rows > 0 && cols * rows === enabled.length) {
-    return `${cols} Spalten × ${rows} Reihen`
+  const { columns, rows } = inferWallRasterLayout(wall)
+  if (columns > 0 && rows > 0 && columns * rows === enabled.length) {
+    return `${columns} Spalten × ${rows} Reihen`
   }
   return `Unregelmäßig · ${enabled.length} Panels`
 }

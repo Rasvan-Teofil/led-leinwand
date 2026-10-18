@@ -274,6 +274,57 @@ describe('LED wall calculations', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('Jinyuan with float panel coords still resolves native 1024×640', () => {
+    const presets = clonePresetsForProject()
+    const j500 = presets.find(d => d.id === 'jinyuan-p391-500x500')!
+    const j1000 = presets.find(d => d.id === 'jinyuan-p391-500x1000')!
+    const defs = [j500, j1000]
+    const wall: LEDWall = {
+      id: 'jinyuan-float',
+      name: 'Jinyuan',
+      xMm: 0,
+      yMm: 0,
+      visible: true,
+      locked: false,
+      panels: []
+    }
+    for (let col = 0; col < 8; col++) {
+      const x = col * 500 + 0.142857
+      wall.panels.push(
+        {
+          id: `p-${col}-t1`,
+          panelDefinitionId: j1000.id,
+          xMm: x,
+          yMm: 0.00001,
+          rotation: 0,
+          enabled: true
+        },
+        {
+          id: `p-${col}-t2`,
+          panelDefinitionId: j1000.id,
+          xMm: x,
+          yMm: 1000,
+          rotation: 0,
+          enabled: true
+        },
+        {
+          id: `p-${col}-b`,
+          panelDefinitionId: j500.id,
+          xMm: x,
+          yMm: 2000,
+          rotation: 0,
+          enabled: true
+        }
+      )
+    }
+    const res = analyzeNativeResolution(wall, defs, 0)
+    expect(res.valid).toBe(true)
+    expect(res.resolutionX).toBe(1024)
+    expect(res.resolutionY).toBe(640)
+    expect(res.warnings).not.toContain('gaps_in_grid')
+    expect(res.warnings).not.toContain('non_rectangular')
+  })
+
   it('Jinyuan 8-column wall: 1024x640 native, 10 m², uniform pitch raster', () => {
     const presets = clonePresetsForProject()
     const j500 = presets.find(d => d.id === 'jinyuan-p391-500x500')!

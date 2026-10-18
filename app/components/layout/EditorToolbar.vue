@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
+import { resetDemoProject } from '~/composables/useDemoProject'
 import { useProjectStore } from '~/stores/project'
 
 const project = useProjectStore()
@@ -10,6 +11,13 @@ const persistence = useProjectPersistence()
 const { exportPng, exportPdf } = useExport()
 
 const settingsOpen = ref(false)
+const resetDemoOpen = ref(false)
+
+function confirmResetDemo() {
+  resetDemoProject()
+  resetDemoOpen.value = false
+  settingsOpen.value = false
+}
 const projectName = computed({
   get: () => project.project.name,
   set: (v: string) => project.renameProject(v)
@@ -180,6 +188,42 @@ watch(
           <p class="text-muted text-xs">
             Alle Berechnungen in mm. Keine Daten werden an Server gesendet.
           </p>
+          <UButton
+            block
+            variant="outline"
+            color="neutral"
+            icon="i-lucide-rotate-ccw"
+            label="Demo zurücksetzen"
+            data-testid="reset-demo-button"
+            @click="resetDemoOpen = true"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="resetDemoOpen"
+      title="Demo zurücksetzen?"
+    >
+      <template #body>
+        <p class="text-sm text-muted">
+          Das gespeicherte Projekt wird gelöscht und die Demo-Wände (Jinyuan 8×3, L-Form) neu geladen.
+          Eigene Änderungen gehen verloren.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton
+            variant="ghost"
+            label="Abbrechen"
+            @click="resetDemoOpen = false"
+          />
+          <UButton
+            color="neutral"
+            label="Zurücksetzen"
+            data-testid="reset-demo-confirm"
+            @click="confirmResetDemo"
+          />
         </div>
       </template>
     </UModal>

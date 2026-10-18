@@ -90,8 +90,8 @@ export function inferWallRasterLayout(wall: LEDWall): {
 } {
   const enabled = wall.panels.filter(p => p.enabled)
   if (enabled.length === 0) return { columns: 1, rows: 1 }
-  const xs = [...new Set(enabled.map(p => p.xMm))].sort((a, b) => a - b)
-  const ys = [...new Set(enabled.map(p => p.yMm))].sort((a, b) => a - b)
+  const xs = [...new Set(enabled.map(p => Math.round(p.xMm)))].sort((a, b) => a - b)
+  const ys = [...new Set(enabled.map(p => Math.round(p.yMm)))].sort((a, b) => a - b)
   return { columns: xs.length, rows: ys.length }
 }
 

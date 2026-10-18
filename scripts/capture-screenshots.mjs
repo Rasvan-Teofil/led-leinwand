@@ -14,12 +14,16 @@ await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('[data-testid="canvas-container"] canvas', { timeout: 30_000 })
 await page.getByTestId('canvas-fit-all').click()
 await page.screenshot({ path: path.join(outDir, 'editor-dark.png'), fullPage: true })
+await page.evaluate(() => window.__ledDesignerTest?.editor.clearSelection())
+await page.waitForTimeout(200)
+await page.screenshot({ path: path.join(outDir, 'editor-inspector-project.png'), fullPage: true })
+await page.getByRole('button', { name: /Jinyuan 4/ }).click()
+await page.locator('[data-testid="gesamtuebersicht-card"]').waitFor({ state: 'visible', timeout: 10_000 })
 const overviewCount = await page.locator('[data-testid="gesamtuebersicht-card"]').count()
 if (overviewCount !== 1) {
   throw new Error(`Expected exactly one Gesamtübersicht card, found ${overviewCount}`)
 }
-await page.screenshot({ path: path.join(outDir, 'editor-dashboard-overview.png'), fullPage: true })
-await page.getByRole('button', { name: /Jinyuan 4/ }).click()
+await page.screenshot({ path: path.join(outDir, 'editor-inspector-wall.png'), fullPage: true })
 await page.evaluate(() => {
   const api = window.__ledDesignerTest
   if (!api) return
@@ -86,13 +90,21 @@ await page.evaluate(() => {
   api.project.updateWall(wall.id, { testPatternKind: 'smpte' })
 })
 
+await page.getByTestId('canvas-fit-all').click()
+await page.waitForTimeout(400)
+await page.screenshot({ path: path.join(outDir, 'editor-full-height-canvas.png'), fullPage: true })
+
 const canvas = page.locator('[data-testid="canvas-container"] canvas').first()
 const box = await canvas.boundingBox()
 if (box) {
   await page.mouse.click(box.x + box.width * 0.32, box.y + box.height * 0.58, { button: 'right' })
-  await page.waitForSelector('[data-testid="canvas-context-menu"]')
-  await page.screenshot({ path: path.join(outDir, 'editor-context-menu.png'), fullPage: true })
-  await page.keyboard.press('Escape')
+  await page.waitForSelector('[data-testid="canvas-context-menu"]', { timeout: 8000 }).catch(() => null)
+  if (!(await page.locator('[data-testid="canvas-context-menu"]').isVisible())) {
+    console.warn('Skipping context menu screenshot')
+  } else {
+    await page.screenshot({ path: path.join(outDir, 'editor-context-menu.png'), fullPage: true })
+    await page.keyboard.press('Escape')
+  }
 }
 
 const dragPoint = await page.evaluate(() => {

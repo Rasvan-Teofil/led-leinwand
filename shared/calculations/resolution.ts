@@ -1,6 +1,7 @@
 import type { PanelDefinition } from '../types/panel'
 import { occupiedResolution, pitchXMm, pitchYMm } from '../types/panel'
 import type { LEDWall } from '../types/wall'
+import { wallWithRoundedPanelOrigins } from '../utils/position'
 import { analyzeUniformPitchRaster } from './uniform-pitch-raster'
 
 export type ResolutionWarningCode
@@ -148,7 +149,10 @@ export function analyzeNativeResolution(
     warnings.push('mixed_pitch')
   }
 
-  const uniformRaster = analyzeUniformPitchRaster(wall, defsById)
+  const uniformRaster = analyzeUniformPitchRaster(
+    wallWithRoundedPanelOrigins(wall),
+    defsById
+  )
   if (uniformRaster) {
     if (uniqueDefs.size > 1) {
       warnings.push('mixed_panel_sizes')

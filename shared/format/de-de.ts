@@ -75,6 +75,11 @@ export function formatPhysicalAspectDisplay(widthMm: number, heightMm: number): 
   return preset ? `${base} (${preset})` : base
 }
 
+export function formatAreaM2De(areaM2: number): string {
+  if (!Number.isFinite(areaM2) || areaM2 < 0) return '—'
+  return `${formatDecimalDe(areaM2, 1)} m²`
+}
+
 export function formatPanelsAreaLine(panelCount: number, areaM2: number): string {
   if (panelCount <= 0) return '—'
   const area = areaM2 > 0 ? formatDecimalDe(areaM2, 1) : '0'

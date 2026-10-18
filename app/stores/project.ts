@@ -8,7 +8,11 @@ import type { PanelDefinition, PanelInstance, RotationDeg } from '#shared/types/
 import type { LEDWall } from '#shared/types/wall'
 import { SCHEMA_VERSION, type LEDWallProject } from '#shared/types/project'
 import { createId } from '#shared/utils/id'
-import { roundPositionMm, roundPositionPatch } from '#shared/utils/position'
+import {
+  normalizeProjectPositions,
+  roundPositionMm,
+  roundPositionPatch
+} from '#shared/utils/position'
 
 export const useProjectStore = defineStore('project', {
   state: () => ({
@@ -25,7 +29,7 @@ export const useProjectStore = defineStore('project', {
       this.project = createEmptyProject(name)
     },
     loadProject(project: LEDWallProject) {
-      this.project = project
+      this.project = normalizeProjectPositions(project)
     },
     renameProject(name: string) {
       this.project.name = name

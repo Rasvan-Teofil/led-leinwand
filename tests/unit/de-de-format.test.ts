@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDecimalDe,
   formatIntegerDe,
+  formatAreaM2De,
   formatMmDe,
   formatMmPairDe,
   formatMetersPair,
@@ -21,6 +22,7 @@ describe('de-DE formatting', () => {
     expect(formatMmDe(4000)).toBe('4.000 mm')
     expect(formatMmDe(357)).toBe('357 mm')
     expect(formatMmPairDe(500, 1000)).toBe('500 × 1.000 mm')
+    expect(formatAreaM2De(10)).toBe('10,0 m²')
   })
 
   it('formats decimals with comma', () => {

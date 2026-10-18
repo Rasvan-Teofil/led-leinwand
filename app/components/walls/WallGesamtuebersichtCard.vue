@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import type { WallOverviewSummary } from '#shared/calculations/wall-overview'
 
-defineProps<{
-  summary: WallOverviewSummary
-  title?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    summary: WallOverviewSummary
+    title?: string
+    compact?: boolean
+  }>(),
+  { compact: false }
+)
 </script>
 
 <template>
   <section
-    class="rounded-lg border border-default bg-default/40 p-3"
+    :class="[
+      props.compact ? 'space-y-2' : 'rounded-lg border border-default bg-default/40 p-3'
+    ]"
     data-testid="gesamtuebersicht-card"
   >
     <div
@@ -21,7 +27,10 @@ defineProps<{
     <p class="mb-3 text-center text-xs text-muted">
       {{ summary.layoutSubtitle }}
     </p>
-    <div class="grid grid-cols-2 gap-x-3 gap-y-4">
+    <div
+      class="grid grid-cols-2 gap-x-3 gap-y-3"
+      :class="props.compact ? 'text-sm' : 'gap-y-4'"
+    >
       <div>
         <div class="text-[10px] uppercase tracking-wide text-muted">
           Gesamtmaße

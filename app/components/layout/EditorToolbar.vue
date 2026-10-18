@@ -47,12 +47,12 @@ watch(
 
 <template>
   <header
-    class="flex h-12 shrink-0 items-center gap-2 border-b border-default bg-elevated/80 px-3 backdrop-blur"
+    class="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-surface)] px-3"
   >
     <div class="flex min-w-0 items-center gap-2">
       <UIcon
         name="i-lucide-grid-3x3"
-        class="size-5 text-primary"
+        class="size-5 text-[var(--app-text)]"
       />
       <span class="hidden font-semibold text-sm sm:inline">LED Wall Designer</span>
       <UInput
@@ -129,26 +129,29 @@ watch(
       />
       <UButton
         size="xs"
-        :color="editor.activeView === 'optimizer' ? 'primary' : 'neutral'"
+        color="neutral"
         variant="ghost"
         icon="i-lucide-sparkles"
         label="Optimizer"
+        :class="editor.activeView === 'optimizer' ? 'view-tab-active' : ''"
         @click="editor.setView('optimizer')"
       />
       <UButton
         size="xs"
-        :color="editor.activeView === 'preview' ? 'primary' : 'neutral'"
+        color="neutral"
         variant="ghost"
         icon="i-lucide-image"
         label="Preview"
+        :class="editor.activeView === 'preview' ? 'view-tab-active' : ''"
         @click="editor.setView('preview')"
       />
       <UButton
         size="xs"
-        :color="editor.activeView === 'editor' ? 'primary' : 'neutral'"
+        color="neutral"
         variant="ghost"
         icon="i-lucide-pencil-ruler"
         label="Editor"
+        :class="editor.activeView === 'editor' ? 'view-tab-active' : ''"
         @click="editor.setView('editor')"
       />
       <UColorModeButton size="xs" />

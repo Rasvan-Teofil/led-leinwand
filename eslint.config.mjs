@@ -14,6 +14,20 @@ export default withNuxt(
           ['^v-bind:ui$', [{ match: 'objectValues' }]]
         ]
       }
+    },
+    rules: {
+      'better-tailwindcss/no-unknown-classes': [
+        'error',
+        {
+          ignore: [
+            '^view-tab-active$',
+            '^app-surface$',
+            '^btn-primary-mono$',
+            '^btn-secondary-mono$',
+            '^app-surface-2$'
+          ]
+        }
+      ]
     }
   }
 )

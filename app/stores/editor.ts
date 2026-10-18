@@ -4,6 +4,7 @@ import type { EditorPreferences } from '#shared/types/project'
 import { DEFAULT_EDITOR_PREFERENCES } from '#shared/types/project'
 
 export type EditorView = 'editor' | 'optimizer' | 'preview'
+export type CanvasTool = 'select' | 'hand'
 
 export interface SelectionState {
   wallIds: string[]
@@ -20,6 +21,7 @@ export const useEditorStore = defineStore('editor', {
     panY: 80,
     preferences: { ...DEFAULT_EDITOR_PREFERENCES } as EditorPreferences,
     spacePanning: false,
+    canvasTool: 'select' as CanvasTool,
     activeView: 'editor' as EditorView,
     dragPanelDefinitionId: null as string | null,
     previewImageDataUrl: null as string | null,
@@ -35,6 +37,7 @@ export const useEditorStore = defineStore('editor', {
       panelId?: string
     } | null,
     canvasDragging: false,
+    canvasDraggingWall: false,
     pendingDeleteWallId: null as string | null,
     snapGuides: [] as SnapGuideLine[],
     snapOverrideDisabled: false,
@@ -48,7 +51,9 @@ export const useEditorStore = defineStore('editor', {
   }),
   getters: {
     primaryWallId: s => s.selection.wallIds[0] ?? null,
-    primaryPanelId: s => s.selection.panelIds[0] ?? null
+    primaryPanelId: s => s.selection.panelIds[0] ?? null,
+    handPanActive: s => s.canvasTool === 'hand' || s.spacePanning,
+    canManipulateObjects: s => s.canvasTool === 'select' && !s.spacePanning
   },
   actions: {
     selectWall(wallId: string, additive = false) {
@@ -96,6 +101,9 @@ export const useEditorStore = defineStore('editor', {
     },
     clearSnapGuides() {
       this.snapGuides = []
+    },
+    setCanvasTool(tool: CanvasTool) {
+      this.canvasTool = tool
     }
   }
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Line } from 'vue-konva'
+import { Circle } from 'vue-konva'
 
 const props = defineProps<{
   width: number
@@ -11,30 +11,30 @@ const props = defineProps<{
   gridMm: number
 }>()
 
-const lines = computed(() => {
+const dots = computed(() => {
   if (!props.visible) return []
-  const spacing = Math.max(props.gridMm * props.zoom, 8)
-  const result: Array<{ points: number[] }> = []
+  const spacing = Math.max(20, Math.min(48, props.gridMm * props.zoom * 0.8))
+  const result: Array<{ x: number, y: number }> = []
   const startX = props.panX % spacing
-  for (let x = startX; x < props.width; x += spacing) {
-    result.push({ points: [x, 0, x, props.height] })
-  }
   const startY = props.panY % spacing
-  for (let y = startY; y < props.height; y += spacing) {
-    result.push({ points: [0, y, props.width, y] })
+  for (let x = startX; x < props.width; x += spacing) {
+    for (let y = startY; y < props.height; y += spacing) {
+      result.push({ x, y })
+    }
   }
   return result
 })
 </script>
 
 <template>
-  <Line
-    v-for="(line, i) in lines"
+  <Circle
+    v-for="(dot, i) in dots"
     :key="i"
     :config="{
-      points: line.points,
-      stroke: '#243044',
-      strokeWidth: 1,
+      x: dot.x,
+      y: dot.y,
+      radius: 1,
+      fill: '#2e2e2e',
       listening: false
     }"
   />

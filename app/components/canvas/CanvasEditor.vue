@@ -9,6 +9,7 @@ import { occupiedSizeMm } from '#shared/types/panel'
 import SnapGuidesLayer from '~/components/canvas/SnapGuidesLayer.vue'
 import { useCanvasNavigation } from '~/composables/useCanvasNavigation'
 import { usePanelSnap } from '~/composables/usePanelSnap'
+import { snapWallOriginMm } from '#shared/calculations/wall-snap'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -36,6 +37,11 @@ const dragPanelStart = ref<{
   panelId: string
   originLocalXMm: number
   originLocalYMm: number
+} | null>(null)
+const dragWallStart = ref<{
+  wallId: string
+  originXMm: number
+  originYMm: number
 } | null>(null)
 
 let resizeObserver: ResizeObserver | null = null
@@ -145,7 +151,8 @@ function onStageMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
   const stage = e.target.getStage()
   if (!stage) return
   const isMiddle = e.evt.button === 1
-  if (isMiddle || editor.spacePanning) {
+  const hand = editor.handPanActive
+  if (isMiddle || hand) {
     isPanning.value = true
     panStart.x = e.evt.clientX
     panStart.y = e.evt.clientY
@@ -153,7 +160,7 @@ function onStageMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
     panStart.panY = editor.panY
     return
   }
-  if (e.target === stage && !editor.canvasDragging) {
+  if (e.target === stage && !editor.canvasDragging && !editor.canvasDraggingWall) {
     editor.clearSelection()
   }
 }
@@ -320,6 +327,52 @@ function onCanvasDrop(e: DragEvent) {
   history.pushHistory()
 }
 
+function applyWallPosition(wallId: string, xMm: number, yMm: number) {
+  const wall = project.walls.find(w => w.id === wallId)
+  if (!wall) return
+  const origin = dragWallStart.value?.wallId === wallId
+    ? { xMm: dragWallStart.value.originXMm, yMm: dragWallStart.value.originYMm }
+    : { xMm: wall.xMm, yMm: wall.yMm }
+  const snapOn = editor.preferences.snapEnabled && !editor.snapOverrideDisabled
+  const snapped = snapWallOriginMm(
+    wall,
+    xMm,
+    yMm,
+    project.walls,
+    project.defsById,
+    editor.zoom,
+    snapOn,
+    editor.preferences.snapMm,
+    origin
+  )
+  editor.setSnapGuides(snapped.guides)
+  project.updateWall(wallId, { xMm: snapped.xMm, yMm: snapped.yMm })
+}
+
+function onWallDragStart(wallId: string) {
+  const wall = project.walls.find(w => w.id === wallId)
+  if (!wall) return
+  history.beginDrag()
+  editor.canvasDraggingWall = true
+  dragWallStart.value = {
+    wallId,
+    originXMm: wall.xMm,
+    originYMm: wall.yMm
+  }
+}
+
+function onWallDragMove(wallId: string, xMm: number, yMm: number) {
+  applyWallPosition(wallId, xMm, yMm)
+}
+
+function onWallDragEnd(wallId: string, xMm: number, yMm: number) {
+  applyWallPosition(wallId, xMm, yMm)
+  history.endDrag()
+  dragWallStart.value = null
+  editor.canvasDraggingWall = false
+  editor.clearSnapGuides()
+}
+
 function onCanvasDragLeave() {
   editor.libraryDropPreview = null
   if (!editor.canvasDragging) {
@@ -333,7 +386,11 @@ defineExpose({ fitAll, resetView })
 <template>
   <div
     ref="containerRef"
-    class="relative h-full min-h-0 w-full flex-1 bg-[#0b0f14]"
+    class="relative h-full min-h-0 w-full flex-1 bg-[var(--app-canvas)]"
+    :class="[
+      (editor.handPanActive || isPanning) ? 'cursor-grab' : '',
+      isPanning ? 'cursor-grabbing' : ''
+    ]"
     data-testid="canvas-container"
     @dragover="onCanvasDragOver"
     @drop="onCanvasDrop"
@@ -374,6 +431,9 @@ defineExpose({ fitAll, resetView })
           @panel-drag-start="onPanelDragStart(wall.id, $event)"
           @panel-drag-move="(panelId: string, x: number, y: number) => onPanelDragMove(wall.id, panelId, x, y)"
           @panel-drag-end="(panelId: string, x: number, y: number) => onPanelDragEnd(wall.id, panelId, x, y)"
+          @wall-drag-start="onWallDragStart(wall.id)"
+          @wall-drag-move="(x, y) => onWallDragMove(wall.id, x, y)"
+          @wall-drag-end="(x, y) => onWallDragEnd(wall.id, x, y)"
         />
       </Layer>
       <Layer>
@@ -386,43 +446,56 @@ defineExpose({ fitAll, resetView })
     </Stage>
 
     <div
-      class="pointer-events-none absolute bottom-3 left-3 flex gap-2 text-xs text-muted"
+      class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2 py-1.5 shadow-lg"
+      data-testid="canvas-floating-toolbar"
     >
-      <span
-        data-testid="zoom-indicator"
-        class="rounded bg-elevated/90 px-2 py-1"
-      >{{ Math.round(editor.zoom * 100) }}%</span>
-      <span
-        v-if="editor.preferences.snapEnabled"
-        class="rounded bg-elevated/90 px-2 py-1"
-      >Snap {{ editor.preferences.snapMm }} mm · Alt frei</span>
-    </div>
-
-    <div class="absolute bottom-3 right-3 flex gap-1">
       <UButton
         size="xs"
-        variant="soft"
+        :variant="editor.canvasTool === 'select' ? 'soft' : 'ghost'"
+        icon="i-lucide-mouse-pointer-2"
+        title="Auswahl (V)"
+        data-testid="tool-select"
+        :class="editor.canvasTool === 'select' ? 'view-tab-active' : ''"
+        @click="editor.setCanvasTool('select')"
+      />
+      <UButton
+        size="xs"
+        :variant="editor.canvasTool === 'hand' ? 'soft' : 'ghost'"
+        icon="i-lucide-hand"
+        title="Hand (H)"
+        data-testid="tool-hand"
+        :class="editor.canvasTool === 'hand' ? 'view-tab-active' : ''"
+        @click="editor.setCanvasTool('hand')"
+      />
+      <span class="mx-1 h-5 w-px bg-[var(--app-border)]" />
+      <span
+        data-testid="zoom-indicator"
+        class="min-w-[3rem] px-2 text-center text-xs text-[var(--app-muted)]"
+      >{{ Math.round(editor.zoom * 100) }}%</span>
+      <UButton
+        size="xs"
+        variant="ghost"
         icon="i-lucide-maximize"
         data-testid="canvas-fit-all"
         @click="fitAll"
       />
       <UButton
         size="xs"
-        variant="soft"
+        variant="ghost"
         icon="i-lucide-rotate-ccw"
         @click="resetView"
       />
       <UButton
         size="xs"
-        variant="soft"
+        variant="ghost"
         :icon="editor.preferences.gridVisible ? 'i-lucide-grid-3x3' : 'i-lucide-grid-2x2'"
         @click="editor.toggleGrid()"
       />
       <UButton
         size="xs"
-        variant="soft"
+        variant="ghost"
         icon="i-lucide-magnet"
-        :color="editor.preferences.snapEnabled ? 'primary' : 'neutral'"
+        :class="editor.preferences.snapEnabled ? 'view-tab-active' : ''"
         @click="editor.toggleSnap()"
       />
     </div>

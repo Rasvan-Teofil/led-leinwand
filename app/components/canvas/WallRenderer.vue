@@ -22,11 +22,15 @@ const emit = defineEmits<{
   panelDragStart: [panelId: string]
   panelDragMove: [panelId: string, xMm: number, yMm: number]
   panelDragEnd: [panelId: string, xMm: number, yMm: number]
+  wallDragStart: []
+  wallDragMove: [xMm: number, yMm: number]
+  wallDragEnd: [xMm: number, yMm: number]
 }>()
 
 const project = useProjectStore()
 const editor = useEditorStore()
 const { getWallPatternUrl } = useTestPatternCache()
+const groupRef = ref<{ getNode: () => Konva.Group } | null>(null)
 
 const patternUrl = computed(() => {
   if (!props.wall.testPatternEnabled) return ''
@@ -38,16 +42,18 @@ const bbox = computed(() =>
   wallLocalBoundingBox(props.wall, project.defsById)
 )
 
-const groupConfig = computed(() => ({
-  x: props.panX + props.wall.xMm * props.zoom,
-  y: props.panY + props.wall.yMm * props.zoom,
-  draggable: !props.wall.locked && editor.selection.wallIds.includes(props.wall.id),
-  listening: true
-}))
-
 const wallSelected = computed(() =>
   editor.selection.wallIds.includes(props.wall.id)
 )
+
+const groupConfig = computed(() => ({
+  x: props.panX + props.wall.xMm * props.zoom,
+  y: props.panY + props.wall.yMm * props.zoom,
+  draggable:
+    editor.canManipulateObjects
+    && !props.wall.locked,
+  listening: editor.canManipulateObjects
+}))
 
 const dimensionOverlay = computed(() => {
   if (!bbox.value || !wallSelected.value) return null
@@ -67,15 +73,52 @@ const dimensionOverlay = computed(() => {
 })
 
 function onWallClick(e: Konva.KonvaEventObject<MouseEvent>) {
+  if (editor.handPanActive) return
+  e.cancelBubble = true
+  if (e.target.getStage()?.isDragging?.()) return
   emit('selectWall', e.evt.shiftKey)
 }
 
-function onGroupDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
-  const node = e.target
-  const xMm = (node.x() - props.panX) / props.zoom
-  const yMm = (node.y() - props.panY) / props.zoom
-  project.updateWall(props.wall.id, { xMm, yMm })
+function localOriginFromNode(node: Konva.Node) {
+  return {
+    xMm: (node.x() - props.panX) / props.zoom,
+    yMm: (node.y() - props.panY) / props.zoom
+  }
 }
+
+function onHandleMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
+  if (!editor.canManipulateObjects || props.wall.locked) return
+  e.cancelBubble = true
+  emit('selectWall', false)
+  groupRef.value?.getNode()?.startDrag()
+}
+
+function onWallDragStart() {
+  emit('selectWall', false)
+  emit('wallDragStart')
+}
+
+function onWallDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+  const pos = localOriginFromNode(e.target)
+  emit('wallDragMove', pos.xMm, pos.yMm)
+}
+
+function onWallDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
+  const pos = localOriginFromNode(e.target)
+  emit('wallDragEnd', pos.xMm, pos.yMm)
+}
+
+watch(
+  () => [props.wall.xMm, props.wall.yMm],
+  () => {
+    const node = groupRef.value?.getNode()
+    if (!node || !editor.canvasDraggingWall) return
+    node.position({
+      x: props.panX + props.wall.xMm * props.zoom,
+      y: props.panY + props.wall.yMm * props.zoom
+    })
+  }
+)
 
 function onWallContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
   e.evt.preventDefault()
@@ -100,9 +143,12 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
 
 <template>
   <Group
+    ref="groupRef"
     :config="groupConfig"
     @click="onWallClick"
-    @dragend="onGroupDragEnd"
+    @dragstart="onWallDragStart"
+    @dragmove="onWallDragMove"
+    @dragend="onWallDragEnd"
   >
     <Rect
       v-if="bbox"
@@ -111,11 +157,12 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         y: bbox.yMm * zoom,
         width: bbox.widthMm * zoom,
         height: bbox.heightMm * zoom,
-        stroke: wallSelected ? '#38bdf8' : '#334155',
+        stroke: wallSelected ? '#ffffff' : '#525252',
         strokeWidth: wallSelected ? 2 : 1,
         dash: [6, 4],
-        fill: wall.testPatternEnabled ? 'rgba(15,23,42,0.15)' : 'rgba(15,23,42,0.35)',
-        listening: true
+        fill: wall.testPatternEnabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
+        listening: true,
+        name: 'wall-frame'
       }"
       @contextmenu="onWallContextMenu"
     />
@@ -131,13 +178,28 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         opacity: 0.92
       }"
     />
+    <Rect
+      v-if="bbox"
+      :config="{
+        x: bbox.xMm * zoom,
+        y: bbox.yMm * zoom - 22,
+        width: Math.min(160, bbox.widthMm * zoom),
+        height: 18,
+        fill: 'rgba(255,255,255,0.06)',
+        stroke: wallSelected ? '#ffffff' : '#525252',
+        strokeWidth: 1,
+        listening: true,
+        name: 'wall-drag-handle'
+      }"
+      @mousedown="onHandleMouseDown"
+    />
     <Text
       :config="{
-        x: (bbox?.xMm ?? 0) * zoom,
+        x: (bbox?.xMm ?? 0) * zoom + 6,
         y: (bbox?.yMm ?? 0) * zoom - 18,
         text: wall.name,
-        fontSize: 12,
-        fill: '#94a3b8',
+        fontSize: 11,
+        fill: '#a3a3a3',
         listening: false
       }"
     />
@@ -145,7 +207,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       <Line
         :config="{
           points: dimensionOverlay.hLine,
-          stroke: '#64748b',
+          stroke: '#737373',
           strokeWidth: 1,
           listening: false
         }"
@@ -153,7 +215,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       <Line
         :config="{
           points: dimensionOverlay.vLine,
-          stroke: '#64748b',
+          stroke: '#737373',
           strokeWidth: 1,
           listening: false
         }"
@@ -164,7 +226,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
           y: dimensionOverlay.widthText.y,
           text: dimensionOverlay.widthLabel,
           fontSize: 11,
-          fill: '#94a3b8',
+          fill: '#a3a3a3',
           listening: false
         }"
       />
@@ -174,7 +236,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
           y: dimensionOverlay.heightText.y,
           text: dimensionOverlay.heightLabel,
           fontSize: 11,
-          fill: '#94a3b8',
+          fill: '#a3a3a3',
           listening: false
         }"
       />

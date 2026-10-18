@@ -18,6 +18,12 @@ export function useKeyboardShortcuts() {
     if (e.key === 'Alt') {
       editor.snapOverrideDisabled = true
     }
+    if (e.key === 'v' || e.key === 'V') {
+      editor.setCanvasTool('select')
+    }
+    if (e.key === 'h' || e.key === 'H') {
+      editor.setCanvasTool('hand')
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
       history.undo()

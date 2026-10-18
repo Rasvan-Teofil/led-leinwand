@@ -56,13 +56,14 @@ function saveCustomPanel(def: PanelDefinition) {
 </script>
 
 <template>
-  <aside class="flex h-full w-64 shrink-0 flex-col border-r border-default bg-elevated/50">
+  <aside class="app-surface flex h-full w-64 shrink-0 flex-col border-r">
     <div class="space-y-2 border-b border-default p-2">
       <UButton
         block
         size="sm"
         icon="i-lucide-plus"
         label="Neue Wand"
+        class="btn-primary-mono"
         @click="onNewWall"
       />
     </div>
@@ -81,7 +82,7 @@ function saveCustomPanel(def: PanelDefinition) {
             <button
               type="button"
               class="flex w-full items-center gap-1 px-2 py-1.5 text-left text-sm"
-              :class="editor.selection.wallIds.includes(wall.id) ? 'bg-primary/15' : ''"
+              :class="editor.selection.wallIds.includes(wall.id) ? 'bg-[var(--app-surface-2)] ring-1 ring-[var(--app-border)]' : ''"
               @click="editor.selectWall(wall.id)"
             >
               <UIcon

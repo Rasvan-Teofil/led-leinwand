@@ -47,16 +47,20 @@ const rectConfig = computed(() => {
     fill: props.invalid
       ? 'rgba(239,68,68,0.35)'
       : props.selected
-        ? 'rgba(56,189,248,0.35)'
-        : 'rgba(30,64,175,0.45)',
-    stroke: props.invalid ? '#ef4444' : props.selected ? '#38bdf8' : '#1d4ed8',
+        ? 'rgba(255,255,255,0.22)'
+        : 'rgba(255,255,255,0.08)',
+    stroke: props.invalid ? '#ef4444' : props.selected ? '#ffffff' : '#525252',
     strokeWidth: props.selected ? 2 : 1,
-    draggable: !props.locked && props.panel.enabled
+    draggable:
+      editor.canManipulateObjects
+      && !props.locked
+      && props.panel.enabled
   }
 })
 
 function onClick(e: Konva.KonvaEventObject<MouseEvent>) {
   e.cancelBubble = true
+  if (editor.handPanActive) return
   if (e.target.getStage()?.isDragging?.()) return
   emit('select', e.evt.shiftKey)
 }

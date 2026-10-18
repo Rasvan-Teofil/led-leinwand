@@ -163,6 +163,7 @@ export interface ProjectOverviewSummary {
   physicalAspect: string
   totalPixels: string
   totalPixelsNote: string | null
+  usesActivePixels: boolean
 }
 
 export function buildProjectOverviewSummary(
@@ -181,7 +182,8 @@ export function buildProjectOverviewSummary(
       effectivePitchNote: null,
       physicalAspect: '—',
       totalPixels: '—',
-      totalPixelsNote: null
+      totalPixelsNote: null,
+      usesActivePixels: false
     }
   }
   if (walls.length === 1) {
@@ -212,6 +214,7 @@ export function buildProjectOverviewSummary(
     effectivePitchNote: 'Projektweit nicht eindeutig',
     physicalAspect: '—',
     totalPixels: formatIntegerDe(totalPixels),
-    totalPixelsNote: 'Summe aller Wände'
+    totalPixelsNote: 'Summe aller Wände',
+    usesActivePixels: false
   }
 }

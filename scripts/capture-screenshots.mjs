@@ -13,6 +13,7 @@ await page.addInitScript(() => localStorage.clear())
 await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('[data-testid="canvas-container"] canvas', { timeout: 30_000 })
 await page.getByTestId('canvas-fit-all').click()
+await page.screenshot({ path: path.join(outDir, 'editor-dark.png'), fullPage: true })
 await page.getByRole('button', { name: /Jinyuan 4/ }).click()
 await page.locator('[data-testid="gesamtuebersicht-card"]').first().waitFor({ state: 'visible', timeout: 10_000 })
 await page.evaluate(() => {
@@ -88,6 +89,47 @@ await page.screenshot({ path: path.join(outDir, 'optimizer.png'), fullPage: true
 await page.getByRole('button', { name: 'Preview' }).click()
 await page.waitForTimeout(500)
 await page.screenshot({ path: path.join(outDir, 'preview-testpattern.png'), fullPage: true })
+
+await page.getByRole('button', { name: 'Editor' }).click()
+await page.waitForTimeout(300)
+const wallDrag = await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return null
+  const wall = api.project.walls.find(w => w.name.includes('L-Form'))
+  if (!wall) return null
+  api.editor.setZoom(0.08)
+  api.editor.setPan(60, 50)
+  api.editor.selectWall(wall.id)
+  return { wallId: wall.id, ...api.getWallDragHandleClientPoint(wall.id) }
+})
+if (wallDrag?.x) {
+  await page.mouse.move(wallDrag.x, wallDrag.y)
+  await page.mouse.down()
+  await page.mouse.move(wallDrag.x + 100, wallDrag.y + 55, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: path.join(outDir, 'editor-wall-moved.png'), fullPage: true })
+}
+
+await page.getByTestId('tool-hand').click()
+const canvasBox = await page.locator('[data-testid="canvas-container"] canvas').first().boundingBox()
+if (canvasBox) {
+  const cx = canvasBox.x + canvasBox.width / 2
+  const cy = canvasBox.y + canvasBox.height / 2
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  await page.mouse.move(cx + 80, cy + 45, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: path.join(outDir, 'editor-hand-tool.png'), fullPage: true })
+}
+
+await page.evaluate(() => {
+  document.documentElement.classList.remove('dark')
+  localStorage.setItem('nuxt-color-mode', 'light')
+})
+await page.waitForTimeout(400)
+await page.screenshot({ path: path.join(outDir, 'editor-light.png'), fullPage: true })
 
 await browser.close()
 console.log('Screenshots saved to', outDir)

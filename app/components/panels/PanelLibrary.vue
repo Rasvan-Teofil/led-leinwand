@@ -17,6 +17,12 @@ function formatPitch(def: PanelDefinition) {
     ? `P${def.nominalPitchMm} (≈${px.toFixed(2)} mm)`
     : `${px.toFixed(2)}×${pitchYMm(def).toFixed(2)} mm`
 }
+
+function onDragStart(e: DragEvent, defId: string) {
+  e.dataTransfer?.setData('text/plain', defId)
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'
+  emit('drag', defId)
+}
 </script>
 
 <template>
@@ -29,8 +35,8 @@ function formatPitch(def: PanelDefinition) {
         v-for="def in definitions"
         :key="def.id"
         draggable="true"
-        class="cursor-grab rounded-md border border-default bg-default/40 px-2 py-1.5 text-xs hover:border-primary/40"
-        @dragstart="(e) => { e.dataTransfer?.setData('text/plain', def.id); e.dataTransfer!.effectAllowed = 'copy'; emit('drag', def.id) }"
+        class="cursor-grab rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs hover:border-[var(--app-muted)]"
+        @dragstart="(e: DragEvent) => onDragStart(e, def.id)"
       >
         <div class="flex items-start justify-between gap-1">
           <span class="font-medium leading-tight">{{ def.name }}</span>

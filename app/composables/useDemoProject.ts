@@ -18,7 +18,11 @@ export function seedDemoProject() {
   history.pushHistory()
   const rectId = project.addWall('Jinyuan 4×2,5 m')
   if (rectId) {
-    project.updateWall(rectId, { xMm: 0, yMm: 0 })
+    project.updateWall(rectId, {
+      xMm: 0,
+      yMm: 0,
+      panelLayoutMode: 'auto'
+    })
     for (let col = 0; col < 8; col++) {
       const x = col * 500
       project.addPanel(rectId, jinyuan1000.id, x, 0)

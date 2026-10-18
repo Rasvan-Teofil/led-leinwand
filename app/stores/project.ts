@@ -46,7 +46,8 @@ export const useProjectStore = defineStore('project', {
         yMm: 200,
         panels: [],
         visible: true,
-        locked: false
+        locked: false,
+        panelLayoutMode: 'manual'
       }
       this.project.walls.push(wall)
       this.touch()

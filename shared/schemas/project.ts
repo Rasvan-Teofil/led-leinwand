@@ -49,7 +49,17 @@ export const ledWallSchema = z.object({
   locked: z.boolean(),
   color: z.string().optional(),
   testPatternEnabled: z.boolean().optional(),
-  testPatternKind: z.enum(['smpte', 'grid', 'cabinet', 'pitch', 'coverage']).optional()
+  testPatternKind: z.enum(['smpte', 'grid', 'cabinet', 'pitch', 'coverage']).optional(),
+  panelLayoutMode: z.enum(['auto', 'manual']).optional(),
+  resolutionMaskEnabled: z.boolean().optional(),
+  resolutionMaskPreset: z
+    .enum(['hd', 'fullHd', 'qhd', 'uhd', 'custom'])
+    .optional(),
+  resolutionMaskCustomWidthPx: z.number().int().positive().optional(),
+  resolutionMaskCustomHeightPx: z.number().int().positive().optional(),
+  resolutionMaskFitMode: z.enum(['contain', 'cover', 'oneToOne']).optional(),
+  resolutionMaskOffsetLocalXMm: z.number().optional(),
+  resolutionMaskOffsetLocalYMm: z.number().optional()
 })
 
 export const ledWallProjectSchema = z.object({

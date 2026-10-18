@@ -12,7 +12,7 @@ export const useHistoryStore = defineStore('history', {
     dragActive: false
   }),
   getters: {
-    canUndo: s => s.past.length > 0,
+    canUndo: s => s.past.length > 1,
     canRedo: s => s.future.length > 0
   },
   actions: {
@@ -30,11 +30,12 @@ export const useHistoryStore = defineStore('history', {
       this.future = []
     },
     undo() {
-      if (!this.canUndo) return
+      if (this.past.length < 2) return
       const project = useProjectStore()
       const current = this.snapshot()
-      const previous = this.past.pop()!
       this.future.push(current)
+      this.past.pop()
+      const previous = this.past[this.past.length - 1]!
       this.recording = false
       project.replaceProjectSnapshot(previous)
       this.recording = true

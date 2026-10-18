@@ -113,7 +113,8 @@ function onClick(e: Konva.KonvaEventObject<MouseEvent>) {
   emit('select', e.evt.shiftKey)
 }
 
-function onDragStart() {
+function onDragStart(e: Konva.KonvaEventObject<DragEvent>) {
+  e.cancelBubble = true
   emit('dragStart')
 }
 

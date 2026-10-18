@@ -5,10 +5,12 @@ import { pitchXMm, pitchYMm } from '#shared/types/panel'
 
 defineProps<{
   definitions: PanelDefinition[]
+  selectedDefinitionId: string | null
 }>()
 
 const emit = defineEmits<{
   drag: [id: string]
+  select: [id: string]
   edit: [def: PanelDefinition]
 }>()
 
@@ -22,6 +24,7 @@ function formatPitch(def: PanelDefinition) {
 function onDragStart(e: DragEvent, defId: string) {
   e.dataTransfer?.setData('text/plain', defId)
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'
+  emit('select', defId)
   emit('drag', defId)
 }
 </script>
@@ -36,7 +39,14 @@ function onDragStart(e: DragEvent, defId: string) {
         v-for="def in definitions"
         :key="def.id"
         draggable="true"
-        class="cursor-grab rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs hover:border-[var(--app-muted)]"
+        :data-testid="`library-panel-${def.id}`"
+        class="cursor-grab rounded-md border px-2 py-1.5 text-xs hover:border-[var(--app-muted)]"
+        :class="
+          selectedDefinitionId === def.id
+            ? 'border-[var(--app-text)] bg-[var(--app-surface-2)] ring-1 ring-[var(--app-border)]'
+            : 'border-[var(--app-border)] bg-[var(--app-surface-2)]'
+        "
+        @click="emit('select', def.id)"
         @dragstart="(e: DragEvent) => onDragStart(e, def.id)"
       >
         <div class="flex items-start justify-between gap-1">

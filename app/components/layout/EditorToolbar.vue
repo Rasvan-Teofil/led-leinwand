@@ -93,6 +93,7 @@ watch(
         color="neutral"
         variant="ghost"
         icon="i-lucide-undo-2"
+        data-testid="toolbar-undo"
         :disabled="!history.canUndo"
         @click="history.undo()"
       />
@@ -101,6 +102,7 @@ watch(
         color="neutral"
         variant="ghost"
         icon="i-lucide-redo-2"
+        data-testid="toolbar-redo"
         :disabled="!history.canRedo"
         @click="history.redo()"
       />

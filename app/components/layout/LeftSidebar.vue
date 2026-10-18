@@ -4,10 +4,14 @@ import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
 import { createId } from '#shared/utils/id'
+import { useAddPanelFromLibrary } from '~/composables/useAddPanelFromLibrary'
 
 const project = useProjectStore()
 const editor = useEditorStore()
 const history = useHistoryStore()
+const { addDefinitionToWall } = useAddPanelFromLibrary()
+
+const selectedLibraryDefId = ref<string | null>(null)
 
 const expandedWalls = ref<Record<string, boolean>>({})
 const panelEditorOpen = ref(false)
@@ -29,6 +33,15 @@ function onNewWall() {
 
 function onDragPanel(defId: string) {
   editor.dragPanelDefinitionId = defId
+}
+
+function onSelectLibraryDef(defId: string) {
+  selectedLibraryDefId.value = defId
+}
+
+function onAddLibraryPanelToWall() {
+  if (!selectedLibraryDefId.value) return
+  addDefinitionToWall(selectedLibraryDefId.value)
 }
 
 function onAddCustomPanel() {
@@ -132,8 +145,21 @@ function saveCustomPanel(def: PanelDefinition) {
 
       <PanelsPanelLibrary
         :definitions="project.panelDefinitions"
+        :selected-definition-id="selectedLibraryDefId"
         @drag="onDragPanel"
+        @select="onSelectLibraryDef"
         @edit="(d) => { editingPanel = { ...d }; panelEditorOpen = true }"
+      />
+
+      <UButton
+        v-if="selectedLibraryDefId"
+        block
+        size="sm"
+        icon="i-lucide-plus-square"
+        label="Zur Wand hinzufügen"
+        data-testid="library-add-to-wall"
+        class="btn-primary-mono"
+        @click="onAddLibraryPanelToWall"
       />
 
       <UButton

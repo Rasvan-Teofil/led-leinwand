@@ -57,9 +57,7 @@ const panelsPaintOrder = computed(() => {
 const groupConfig = computed(() => ({
   x: props.panX + props.wall.xMm * props.zoom,
   y: props.panY + props.wall.yMm * props.zoom,
-  draggable:
-    editor.canManipulateObjects
-    && !props.wall.locked,
+  draggable: false,
   listening: editor.canManipulateObjects
 }))
 

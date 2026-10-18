@@ -13,6 +13,8 @@ import { snapWallOriginMm } from '#shared/calculations/wall-snap'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
+import { useAddPanelFromLibrary } from '~/composables/useAddPanelFromLibrary'
+import { useWallLayoutMode } from '~/composables/useWallLayoutMode'
 
 const emit = defineEmits<{ ready: [] }>()
 
@@ -21,6 +23,8 @@ const editor = useEditorStore()
 const history = useHistoryStore()
 const { zoomAt, fitToContent, resetView } = useCanvasNavigation()
 const { snapOnWallLocal, snapFromPointerClient, isWorldTopLeftFree } = usePanelSnap()
+const { addDefinitionToWall } = useAddPanelFromLibrary()
+const { ensureManualLayout } = useWallLayoutMode()
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const isClient = ref(false)
@@ -181,6 +185,7 @@ function onPanelDragStart(wallId: string, panelId: string) {
   const wall = project.walls.find(w => w.id === wallId)
   const panel = wall?.panels.find(p => p.id === panelId)
   if (!wall || !panel) return
+  ensureManualLayout(wallId)
   history.beginDrag()
   editor.canvasDragging = true
   dragPanelStart.value = {
@@ -307,24 +312,16 @@ function onCanvasDragOver(e: DragEvent) {
 
 function onCanvasDrop(e: DragEvent) {
   e.preventDefault()
-  const defId = editor.dragPanelDefinitionId
-  editor.dragPanelDefinitionId = null
+  const fromTransfer = e.dataTransfer?.getData('text/plain')
+  const defId = editor.dragPanelDefinitionId ?? fromTransfer ?? null
   editor.libraryDropPreview = null
   editor.clearSnapGuides()
-  if (!defId) return
-  const placement = snapFromPointerClient(e.clientX, e.clientY, defId, 0)
-  if (!placement) return
-  history.pushHistory()
-  const newId = project.addPanel(
-    placement.wallId,
-    defId,
-    placement.localXMm,
-    placement.localYMm
-  )
-  if (newId) {
-    editor.selectPanel(placement.wallId, newId)
+  if (!defId) {
+    editor.dragPanelDefinitionId = null
+    return
   }
-  history.pushHistory()
+  addDefinitionToWall(defId, { clientX: e.clientX, clientY: e.clientY })
+  editor.dragPanelDefinitionId = null
 }
 
 function applyWallPosition(wallId: string, xMm: number, yMm: number) {
@@ -380,6 +377,47 @@ function onCanvasDragLeave() {
   }
 }
 
+function onDocumentDragOver(e: DragEvent) {
+  if (!editor.dragPanelDefinitionId && !e.dataTransfer?.types.includes('text/plain')) {
+    return
+  }
+  if (!containerRef.value) return
+  const rect = containerRef.value.getBoundingClientRect()
+  if (
+    e.clientX < rect.left
+    || e.clientX > rect.right
+    || e.clientY < rect.top
+    || e.clientY > rect.bottom
+  ) {
+    return
+  }
+  onCanvasDragOver(e)
+}
+
+function onDocumentDrop(e: DragEvent) {
+  if (!containerRef.value) return
+  const rect = containerRef.value.getBoundingClientRect()
+  if (
+    e.clientX < rect.left
+    || e.clientX > rect.right
+    || e.clientY < rect.top
+    || e.clientY > rect.bottom
+  ) {
+    return
+  }
+  onCanvasDrop(e)
+}
+
+onMounted(() => {
+  document.addEventListener('dragover', onDocumentDragOver, true)
+  document.addEventListener('drop', onDocumentDrop, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('dragover', onDocumentDragOver, true)
+  document.removeEventListener('drop', onDocumentDrop, true)
+})
+
 defineExpose({ fitAll, resetView })
 </script>
 
@@ -392,8 +430,8 @@ defineExpose({ fitAll, resetView })
       isPanning ? 'cursor-grabbing' : ''
     ]"
     data-testid="canvas-container"
-    @dragover="onCanvasDragOver"
-    @drop="onCanvasDrop"
+    @dragover.capture.prevent="onCanvasDragOver"
+    @drop.capture.prevent="onCanvasDrop"
     @dragleave="onCanvasDragLeave"
   >
     <Stage

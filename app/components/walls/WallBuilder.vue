@@ -14,7 +14,13 @@ const wall = computed(() => project.walls.find(w => w.id === wallId.value))
 const panelDefId = ref('')
 const columns = ref(4)
 const rows = ref(3)
-const mode = ref<'auto' | 'manual'>('auto')
+const mode = computed({
+  get: () => wall.value?.panelLayoutMode ?? 'manual',
+  set: (v: 'auto' | 'manual') => {
+    if (!wallId.value) return
+    project.updateWall(wallId.value, { panelLayoutMode: v })
+  }
+})
 
 function syncFromWall(w: NonNullable<typeof wall.value>) {
   const defId = w.panels[0]?.panelDefinitionId ?? project.panelDefinitions[0]?.id
@@ -36,6 +42,7 @@ watch(
 function applyRectangular() {
   if (!wallId.value || !panelDefId.value) return
   history.pushHistory()
+  project.updateWall(wallId.value, { panelLayoutMode: 'auto' })
   project.setRectangularWall(wallId.value, panelDefId.value, columns.value, rows.value)
   history.pushHistory()
 }
@@ -51,6 +58,7 @@ function applyRectangular() {
     </h3>
     <URadioGroup
       v-model="mode"
+      data-testid="wall-layout-mode"
       :items="[
         { label: 'Automatisch (Raster)', value: 'auto' },
         { label: 'Manuell', value: 'manual' }

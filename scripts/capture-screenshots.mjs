@@ -25,6 +25,22 @@ await page.evaluate(() => {
   api.project.updateWall(wall.id, { testPatternEnabled: true, testPatternKind: 'smpte' })
 })
 await page.waitForTimeout(1200)
+const patternOk = await page.evaluate(async () => {
+  const api = window.__ledDesignerTest
+  if (!api) return false
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  if (!wall) return false
+  const r = await api.assertWallTestPatternCoverage(wall.id)
+  return r.ok
+})
+if (!patternOk) throw new Error('Jinyuan test pattern does not cover all panels')
+await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return
+  api.editor.setZoom(0.14)
+  api.editor.setPan(180, 120)
+})
+await page.waitForTimeout(300)
 await page.screenshot({ path: path.join(outDir, 'editor-jinyuan-testpattern.png'), fullPage: true })
 
 const canvas = page.locator('[data-testid="canvas-container"] canvas').first()
@@ -80,6 +96,8 @@ if (snapDrag) {
   await page.waitForTimeout(500)
   await page.screenshot({ path: path.join(outDir, 'editor-magnetic-snap-guides.png'), fullPage: true })
   await page.mouse.up()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: path.join(outDir, 'editor-panel-snapped.png'), fullPage: true })
 }
 
 await page.getByRole('button', { name: 'Optimizer' }).click()

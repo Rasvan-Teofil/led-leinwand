@@ -248,6 +248,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       :wall-id="wall.id"
       :zoom="zoom"
       :locked="wall.locked"
+      :test-pattern-active="wall.testPatternEnabled"
       :selected="editor.selection.panelIds.includes(panel.id)"
       :invalid="overlapIds.has(panel.id)"
       @select="(additive) => emit('selectPanel', panel.id, additive)"

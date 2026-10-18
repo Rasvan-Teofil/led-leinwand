@@ -11,6 +11,7 @@ const props = defineProps<{
   wallId: string
   zoom: number
   locked: boolean
+  testPatternActive?: boolean
   selected: boolean
   invalid: boolean
 }>()
@@ -46,9 +47,11 @@ const rectConfig = computed(() => {
     rotation: props.panel.rotation,
     fill: props.invalid
       ? 'rgba(239,68,68,0.35)'
-      : props.selected
-        ? 'rgba(255,255,255,0.22)'
-        : 'rgba(255,255,255,0.08)',
+      : props.testPatternActive
+        ? 'transparent'
+        : props.selected
+          ? 'rgba(255,255,255,0.22)'
+          : 'rgba(255,255,255,0.08)',
     stroke: props.invalid ? '#ef4444' : props.selected ? '#ffffff' : '#525252',
     strokeWidth: props.selected ? 2 : 1,
     draggable:

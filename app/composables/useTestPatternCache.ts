@@ -30,6 +30,7 @@ export function useTestPatternCache() {
     const url = generateWallTestPatternDataUrl({
       wall,
       defsById: project.defsById,
+      panelDefinitions: project.panelDefinitions,
       kind: wall.testPatternKind as TestPatternKind,
       resolutionX: resX > 0 ? resX : undefined,
       resolutionY: resY > 0 ? resY : undefined

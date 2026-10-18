@@ -1,4 +1,5 @@
 import { analyzeUniformPitchRaster } from '../calculations/uniform-pitch-raster'
+import { analyzeNativeResolution } from '../calculations/resolution'
 import { wallLocalBoundingBox } from '../calculations/geometry'
 import type { PanelDefinition } from '../types/panel'
 import { occupiedSizeMm } from '../types/panel'
@@ -9,6 +10,7 @@ export type TestPatternKind = 'smpte' | 'grid' | 'cabinet' | 'pitch'
 export interface TestPatternInput {
   wall: LEDWall
   defsById: Map<string, PanelDefinition>
+  panelDefinitions: PanelDefinition[]
   kind: TestPatternKind
   resolutionX?: number
   resolutionY?: number
@@ -16,119 +18,222 @@ export interface TestPatternInput {
 
 const MAX_EDGE_PX = 2048
 
-function scaleToMax(w: number, h: number): { w: number, h: number, scale: number } {
-  const m = Math.max(w, h)
-  if (m <= MAX_EDGE_PX) return { w, h, scale: 1 }
-  const scale = MAX_EDGE_PX / m
-  return { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)), scale }
+export interface PatternRasterResolution {
+  resX: number
+  resY: number
+  useNativePitchMap: boolean
 }
 
-function mmToPxLinear(
-  mm: number,
-  spanMm: number,
-  pxSpan: number
-): number {
-  return (mm / spanMm) * pxSpan
-}
-
-interface PanelPixelRect {
+export interface PanelPixelRect {
+  panelId: string
   x: number
   y: number
   w: number
   h: number
 }
 
-function panelPixelRects(
+function scaleToMax(w: number, h: number): { w: number, h: number } {
+  const m = Math.max(w, h)
+  if (m <= MAX_EDGE_PX) return { w, h }
+  const scale = MAX_EDGE_PX / m
+  return {
+    w: Math.max(1, Math.round(w * scale)),
+    h: Math.max(1, Math.round(h * scale))
+  }
+}
+
+export function resolveWallPatternRaster(
+  wall: LEDWall,
+  defsById: Map<string, PanelDefinition>,
+  panelDefinitions: PanelDefinition[],
+  overrides?: { resolutionX?: number, resolutionY?: number }
+): PatternRasterResolution | null {
+  const bbox = wallLocalBoundingBox(wall, defsById)
+  if (!bbox || bbox.widthMm <= 0 || bbox.heightMm <= 0) return null
+
+  const uniform = analyzeUniformPitchRaster(wall, defsById)
+  const native = analyzeNativeResolution(wall, panelDefinitions, 0)
+
+  const resX = overrides?.resolutionX && overrides.resolutionX > 0
+    ? overrides.resolutionX
+    : uniform?.resolutionX
+      ?? (native.valid ? native.resolutionX : Math.round(bbox.widthMm / 3.91))
+  const resY = overrides?.resolutionY && overrides.resolutionY > 0
+    ? overrides.resolutionY
+    : uniform?.resolutionY
+      ?? (native.valid ? native.resolutionY : Math.round(bbox.heightMm / 3.91))
+
+  if (resX <= 0 || resY <= 0) return null
+
+  const useNativePitchMap = Boolean(uniform) || native.valid
+
+  return { resX, resY, useNativePitchMap }
+}
+
+function panelNativePixelRect(
+  panel: LEDWall['panels'][number],
+  def: PanelDefinition,
+  bbox: { xMm: number, yMm: number, widthMm: number, heightMm: number }
+): { x0: number, y0: number, x1: number, y1: number } {
+  const size = occupiedSizeMm(def, panel.rotation)
+  const px0 = ((panel.xMm - bbox.xMm) * def.resolutionX) / def.widthMm
+  const py0 = ((panel.yMm - bbox.yMm) * def.resolutionY) / def.heightMm
+  const px1 = px0 + (size.widthMm * def.resolutionX) / def.widthMm
+  const py1 = py0 + (size.heightMm * def.resolutionY) / def.heightMm
+  return {
+    x0: Math.floor(px0),
+    y0: Math.floor(py0),
+    x1: Math.ceil(px1),
+    y1: Math.ceil(py1)
+  }
+}
+
+function mmToPxLinear(mm: number, spanMm: number, pxSpan: number): number {
+  return (mm / spanMm) * pxSpan
+}
+
+export function buildPatternPanelMaskRects(
   wall: LEDWall,
   defsById: Map<string, PanelDefinition>,
   resX: number,
   resY: number,
-  bbox: { xMm: number, yMm: number, widthMm: number, heightMm: number },
   useNativePitchMap: boolean
 ): PanelPixelRect[] {
+  const bbox = wallLocalBoundingBox(wall, defsById)
+  if (!bbox) return []
+
   const out: PanelPixelRect[] = []
   for (const panel of wall.panels.filter(p => p.enabled)) {
     const def = defsById.get(panel.panelDefinitionId)
     if (!def) continue
     const size = occupiedSizeMm(def, panel.rotation)
+
     if (useNativePitchMap) {
-      const x = ((panel.xMm - bbox.xMm) * def.resolutionX) / def.widthMm
-      const y = ((panel.yMm - bbox.yMm) * def.resolutionY) / def.heightMm
-      const w = (size.widthMm * def.resolutionX) / def.widthMm
-      const h = (size.heightMm * def.resolutionY) / def.heightMm
-      out.push({
-        x: Math.round(x),
-        y: Math.round(y),
-        w: Math.max(1, Math.round(w)),
-        h: Math.max(1, Math.round(h))
-      })
+      const { x0, y0, x1, y1 } = panelNativePixelRect(panel, def, bbox)
+      const w = Math.max(1, Math.min(resX, x1) - Math.max(0, x0))
+      const h = Math.max(1, Math.min(resY, y1) - Math.max(0, y0))
+      const x = Math.max(0, x0)
+      const y = Math.max(0, y0)
+      out.push({ panelId: panel.id, x, y, w, h })
     } else {
+      const x = Math.floor(
+        mmToPxLinear(panel.xMm - bbox.xMm, bbox.widthMm, resX)
+      )
+      const y = Math.floor(
+        mmToPxLinear(panel.yMm - bbox.yMm, bbox.heightMm, resY)
+      )
+      const x1 = Math.ceil(
+        mmToPxLinear(
+          panel.xMm - bbox.xMm + size.widthMm,
+          bbox.widthMm,
+          resX
+        )
+      )
+      const y1 = Math.ceil(
+        mmToPxLinear(
+          panel.yMm - bbox.yMm + size.heightMm,
+          bbox.heightMm,
+          resY
+        )
+      )
       out.push({
-        x: Math.round(mmToPxLinear(panel.xMm - bbox.xMm, bbox.widthMm, resX)),
-        y: Math.round(mmToPxLinear(panel.yMm - bbox.yMm, bbox.heightMm, resY)),
-        w: Math.max(1, Math.round(mmToPxLinear(size.widthMm, bbox.widthMm, resX))),
-        h: Math.max(1, Math.round(mmToPxLinear(size.heightMm, bbox.heightMm, resY)))
+        panelId: panel.id,
+        x: Math.max(0, x),
+        y: Math.max(0, y),
+        w: Math.max(1, Math.min(resX, x1) - x),
+        h: Math.max(1, Math.min(resY, y1) - y)
       })
     }
   }
   return out
 }
 
+/** Pixel centers (native raster) used to verify each panel received pattern pixels. */
+export function panelPatternSamplePoints(
+  wall: LEDWall,
+  defsById: Map<string, PanelDefinition>,
+  resX: number,
+  resY: number,
+  useNativePitchMap: boolean
+): Array<{ panelId: string, x: number, y: number }> {
+  return buildPatternPanelMaskRects(
+    wall,
+    defsById,
+    resX,
+    resY,
+    useNativePitchMap
+  ).map(r => ({
+    panelId: r.panelId,
+    x: Math.min(resX - 1, Math.max(0, r.x + Math.floor(r.w / 2))),
+    y: Math.min(resY - 1, Math.max(0, r.y + Math.floor(r.h / 2)))
+  }))
+}
+
 export function generateWallTestPatternDataUrl(input: TestPatternInput): string | null {
   if (typeof document === 'undefined') return null
-  const bbox = wallLocalBoundingBox(input.wall, input.defsById)
-  if (!bbox || bbox.widthMm <= 0 || bbox.heightMm <= 0) return null
 
-  const uniform = analyzeUniformPitchRaster(input.wall, input.defsById)
-  const resX = input.resolutionX && input.resolutionX > 0
-    ? input.resolutionX
-    : uniform
-      ? uniform.resolutionX
-      : Math.round(bbox.widthMm / 3.91)
-  const resY = input.resolutionY && input.resolutionY > 0
-    ? input.resolutionY
-    : uniform
-      ? uniform.resolutionY
-      : Math.round(bbox.heightMm / 3.91)
-  const { w, h } = scaleToMax(resX, resY)
-  const sx = w / resX
-  const sy = h / resY
+  const raster = resolveWallPatternRaster(
+    input.wall,
+    input.defsById,
+    input.panelDefinitions,
+    {
+      resolutionX: input.resolutionX,
+      resolutionY: input.resolutionY
+    }
+  )
+  if (!raster) return null
+
+  const bbox = wallLocalBoundingBox(input.wall, input.defsById)
+  if (!bbox) return null
+
+  const { resX, resY, useNativePitchMap } = raster
+  const { w: outW, h: outH } = scaleToMax(resX, resY)
 
   const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
+  canvas.width = resX
+  canvas.height = resY
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
   ctx.fillStyle = '#0a0a0a'
-  ctx.fillRect(0, 0, w, h)
+  ctx.fillRect(0, 0, resX, resY)
 
-  const rects = panelPixelRects(
+  drawPattern(ctx, input.kind, resX, resY, input.wall, input.defsById, bbox, useNativePitchMap)
+
+  const mask = document.createElement('canvas')
+  mask.width = resX
+  mask.height = resY
+  const mctx = mask.getContext('2d')
+  if (!mctx) return null
+  mctx.fillStyle = '#000'
+  mctx.fillRect(0, 0, resX, resY)
+  const rects = buildPatternPanelMaskRects(
     input.wall,
     input.defsById,
     resX,
     resY,
-    bbox,
-    Boolean(uniform)
+    useNativePitchMap
   )
-
-  const mask = document.createElement('canvas')
-  mask.width = w
-  mask.height = h
-  const mctx = mask.getContext('2d')!
-  mctx.fillStyle = '#000'
-  mctx.fillRect(0, 0, w, h)
   for (const r of rects) {
     mctx.fillStyle = '#fff'
-    mctx.fillRect(r.x * sx, r.y * sy, r.w * sx, r.h * sy)
+    mctx.fillRect(r.x, r.y, r.w, r.h)
   }
 
-  drawPattern(ctx, input.kind, w, h, input.wall, input.defsById, bbox, sx, sy)
   ctx.globalCompositeOperation = 'destination-in'
   ctx.drawImage(mask, 0, 0)
   ctx.globalCompositeOperation = 'source-over'
 
-  return canvas.toDataURL('image/png')
+  if (outW === resX && outH === resY) {
+    return canvas.toDataURL('image/png')
+  }
+
+  const scaled = document.createElement('canvas')
+  scaled.width = outW
+  scaled.height = outH
+  const sctx = scaled.getContext('2d')
+  if (!sctx) return null
+  sctx.drawImage(canvas, 0, 0, outW, outH)
+  return scaled.toDataURL('image/png')
 }
 
 function drawPattern(
@@ -139,8 +244,7 @@ function drawPattern(
   wall: LEDWall,
   defsById: Map<string, PanelDefinition>,
   bbox: { xMm: number, yMm: number, widthMm: number, heightMm: number },
-  _sx: number,
-  _sy: number
+  useNativePitchMap: boolean
 ) {
   switch (kind) {
     case 'smpte':
@@ -150,7 +254,7 @@ function drawPattern(
       drawGrid(ctx, w, h)
       break
     case 'cabinet':
-      drawCabinet(ctx, w, h, wall, defsById, bbox, w, h, Boolean(analyzeUniformPitchRaster(wall, defsById)))
+      drawCabinet(ctx, w, h, wall, defsById, bbox, w, h, useNativePitchMap)
       break
     case 'pitch':
       drawPitch(ctx, w, h)
@@ -212,22 +316,16 @@ function drawCabinet(
 ) {
   ctx.fillStyle = '#0f172a'
   ctx.fillRect(0, 0, w, h)
-  const rects = panelPixelRects(wall, defsById, resX, resY, bbox, useNative)
-  const sx = w / resX
-  const sy = h / resY
+  const rects = buildPatternPanelMaskRects(wall, defsById, resX, resY, useNative)
   let idx = 1
   for (const r of rects) {
-    const x = r.x * sx
-    const y = r.y * sy
-    const pw = r.w * sx
-    const ph = r.h * sy
     ctx.fillStyle = idx % 2 === 0 ? '#1e3a8a' : '#1e40af'
-    ctx.fillRect(x, y, pw, ph)
+    ctx.fillRect(r.x, r.y, r.w, r.h)
     ctx.strokeStyle = '#7dd3fc'
-    ctx.strokeRect(x, y, pw, ph)
+    ctx.strokeRect(r.x, r.y, r.w, r.h)
     ctx.fillStyle = '#e2e8f0'
-    ctx.font = `${Math.max(10, pw / 8)}px sans-serif`
-    ctx.fillText(`#${idx}`, x + 4, y + ph / 2)
+    ctx.font = `${Math.max(10, r.w / 8)}px sans-serif`
+    ctx.fillText(`#${idx}`, r.x + 4, r.y + r.h / 2)
     idx++
   }
 }

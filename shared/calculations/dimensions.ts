@@ -83,6 +83,18 @@ export function rectangularWallSizeMm(
   }
 }
 
+/** Distinct panel origin columns/rows on the wall (for inspector Wand-Builder display). */
+export function inferWallRasterLayout(wall: LEDWall): {
+  columns: number
+  rows: number
+} {
+  const enabled = wall.panels.filter(p => p.enabled)
+  if (enabled.length === 0) return { columns: 1, rows: 1 }
+  const xs = [...new Set(enabled.map(p => p.xMm))].sort((a, b) => a - b)
+  const ys = [...new Set(enabled.map(p => p.yMm))].sort((a, b) => a - b)
+  return { columns: xs.length, rows: ys.length }
+}
+
 export function preservePanelsOnResize(
   existing: LEDWall['panels'],
   newGrid: ReturnType<typeof buildRectangularGrid>,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { inferWallRasterLayout } from '#shared/calculations/dimensions'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -15,14 +16,21 @@ const columns = ref(4)
 const rows = ref(3)
 const mode = ref<'auto' | 'manual'>('auto')
 
+function syncFromWall(w: NonNullable<typeof wall.value>) {
+  const defId = w.panels[0]?.panelDefinitionId ?? project.panelDefinitions[0]?.id
+  if (defId) panelDefId.value = defId
+  const layout = inferWallRasterLayout(w)
+  columns.value = layout.columns
+  rows.value = layout.rows
+}
+
 watch(
   () => wall.value,
   (w) => {
     if (!w) return
-    const defId = w.panels[0]?.panelDefinitionId ?? project.panelDefinitions[0]?.id
-    if (defId) panelDefId.value = defId
+    syncFromWall(w)
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 )
 
 function applyRectangular() {

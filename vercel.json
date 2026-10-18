@@ -1,13 +1,5 @@
 {
-  "version": 2,
-  "name": "led-leinwand",
-  "builds": [
-    {
-      "src": "prototype/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/prototype/$1" }
-  ]
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "nuxtjs"
 }

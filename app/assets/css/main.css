@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  :root {
+    --app-canvas: #f5f5f5;
+    --app-surface: #ffffff;
+    --app-surface-2: #f0f0f0;
+    --app-border: #e5e5e5;
+    --app-text: #0a0a0a;
+    --app-muted: #737373;
+    --app-panel-fill: rgba(0, 0, 0, 0.06);
+    --app-panel-stroke: #a3a3a3;
+    --app-selection: rgba(255, 255, 255, 0.85);
+    --app-selection-stroke: #ffffff;
+  }
+
+  .dark {
+    --app-canvas: #0f0f0f;
+    --app-surface: #1a1a1a;
+    --app-surface-2: #262626;
+    --app-border: #2e2e2e;
+    --app-text: #fafafa;
+    --app-muted: #a3a3a3;
+    --app-panel-fill: rgba(255, 255, 255, 0.08);
+    --app-panel-stroke: #525252;
+    --app-selection: rgba(255, 255, 255, 0.2);
+    --app-selection-stroke: #ffffff;
+  }
+
+  body {
+    @apply bg-[var(--app-surface)] text-[var(--app-text)] antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .app-surface {
+    background-color: var(--app-surface);
+    border-color: var(--app-border);
+  }
+
+  .app-surface-2 {
+    background-color: var(--app-surface-2);
+    border-color: var(--app-border);
+  }
+
+  .btn-primary-mono {
+    @apply rounded-lg border border-[var(--app-border)] bg-white font-medium text-black hover:bg-neutral-100;
+  }
+
+  .dark .btn-primary-mono {
+    @apply bg-white text-black hover:bg-neutral-200;
+  }
+
+  .btn-secondary-mono {
+    @apply rounded-lg border border-[var(--app-border)] bg-transparent font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-2)];
+  }
+
+  .view-tab-active {
+    @apply bg-[var(--app-surface-2)] text-[var(--app-text)] ring-1 ring-[var(--app-border)];
+  }
+}

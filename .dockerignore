@@ -1,5 +1,8 @@
+node_modules
+.nuxt
+.output
 .git
-.gitignore
-tests
-README.md
-docker-compose.yml
+.vercel
+test-results
+playwright-report
+*.log

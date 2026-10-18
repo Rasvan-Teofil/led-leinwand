@@ -1,7 +1,9 @@
 services:
-  led-leinwand:
+  led-wall-designer:
     build: .
     ports:
-      - "8080:8080"
+      - "3000:3000"
     environment:
-      PORT: "8080"
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000

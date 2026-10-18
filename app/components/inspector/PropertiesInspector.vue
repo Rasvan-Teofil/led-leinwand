@@ -2,12 +2,18 @@
 import type { RotationDeg } from '#shared/types/panel'
 import { pitchXMm, pitchYMm } from '#shared/types/panel'
 import { REFERENCE_KIND_LABELS_DE, WARNING_LABELS_DE } from '#shared/i18n/messages-de'
-import type { TestPatternKind } from '#shared/types/wall'
+import type {
+  ResolutionMaskFitMode,
+  ResolutionMaskPresetId,
+  TestPatternKind
+} from '#shared/types/wall'
 import { formatAreaM2De, formatIntegerDe, formatMmPairDe } from '#shared/format/de-de'
 import { roundPositionMm } from '#shared/utils/position'
 import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useProjectMetrics, useWallMetrics } from '~/composables/useWallMetrics'
 import { useWallOverviewSummary } from '~/composables/useWallOverviewSummary'
+import { useResolutionMask } from '~/composables/useResolutionMask'
+import { RESOLUTION_MASK_PRESETS } from '#shared/calculations/resolution-mask'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
@@ -40,6 +46,48 @@ const panelDef = computed(() =>
 
 const metrics = useWallMetrics(() => wall.value)
 const overview = useWallOverviewSummary(() => wall.value ?? null)
+const resolutionMask = useResolutionMask(() => wall.value ?? null)
+
+const maskPresetItems = [
+  ...RESOLUTION_MASK_PRESETS.map(p => ({ label: p.label, value: p.id })),
+  { label: 'Benutzerdefiniert', value: 'custom' as ResolutionMaskPresetId }
+]
+
+const maskFitItems: Array<{ label: string, value: ResolutionMaskFitMode }> = [
+  { label: 'Einpassen (contain)', value: 'contain' },
+  { label: 'Füllen (cover)', value: 'cover' },
+  { label: '1:1 Pixel', value: 'oneToOne' }
+]
+
+function updateResolutionMask(
+  patch: Partial<{
+    enabled: boolean
+    preset: ResolutionMaskPresetId
+    customWidthPx: number
+    customHeightPx: number
+    fitMode: ResolutionMaskFitMode
+  }>
+) {
+  if (!wall.value) return
+  history.pushHistory()
+  const next = {
+    resolutionMaskEnabled: patch.enabled ?? wall.value.resolutionMaskEnabled,
+    resolutionMaskPreset: patch.preset ?? wall.value.resolutionMaskPreset ?? 'fullHd',
+    resolutionMaskCustomWidthPx:
+      patch.customWidthPx ?? wall.value.resolutionMaskCustomWidthPx ?? 1920,
+    resolutionMaskCustomHeightPx:
+      patch.customHeightPx ?? wall.value.resolutionMaskCustomHeightPx ?? 1080,
+    resolutionMaskFitMode: patch.fitMode ?? wall.value.resolutionMaskFitMode ?? 'contain'
+  }
+  if (patch.enabled && !wall.value.resolutionMaskEnabled) {
+    Object.assign(next, {
+      resolutionMaskOffsetLocalXMm: 0,
+      resolutionMaskOffsetLocalYMm: 0
+    })
+  }
+  project.updateWall(wall.value.id, next)
+  history.pushHistory()
+}
 
 const wallWarnings = computed(() => {
   const m = metrics.value
@@ -219,6 +267,124 @@ function clearSelection() {
           </UFormField>
         </div>
         <WallsWallBuilder />
+        <InspectorSection
+          title="Auflösungs-Maske"
+          :default-open="false"
+          data-testid="resolution-mask-section"
+        >
+          <UCheckbox
+            :model-value="wall.resolutionMaskEnabled ?? false"
+            label="Maske anzeigen"
+            data-testid="resolution-mask-toggle"
+            @update:model-value="(v) => updateResolutionMask({ enabled: Boolean(v) })"
+          />
+          <template v-if="wall.resolutionMaskEnabled">
+            <UFormField label="Zielauflösung">
+              <USelect
+                :model-value="wall.resolutionMaskPreset ?? 'fullHd'"
+                :items="maskPresetItems"
+                data-testid="resolution-mask-preset"
+                @update:model-value="(v) => updateResolutionMask({ preset: v as ResolutionMaskPresetId })"
+              />
+            </UFormField>
+            <div
+              v-if="(wall.resolutionMaskPreset ?? 'fullHd') === 'custom'"
+              class="grid grid-cols-2 gap-2"
+            >
+              <UFormField label="Breite (px)">
+                <UInput
+                  :model-value="wall.resolutionMaskCustomWidthPx ?? 1920"
+                  type="number"
+                  min="1"
+                  @update:model-value="(v) => updateResolutionMask({ customWidthPx: Number(v) })"
+                />
+              </UFormField>
+              <UFormField label="Höhe (px)">
+                <UInput
+                  :model-value="wall.resolutionMaskCustomHeightPx ?? 1080"
+                  type="number"
+                  min="1"
+                  @update:model-value="(v) => updateResolutionMask({ customHeightPx: Number(v) })"
+                />
+              </UFormField>
+            </div>
+            <UFormField label="Einpassung">
+              <USelect
+                :model-value="wall.resolutionMaskFitMode ?? 'contain'"
+                :items="maskFitItems"
+                data-testid="resolution-mask-fit"
+                @update:model-value="(v) => updateResolutionMask({ fitMode: v as ResolutionMaskFitMode })"
+              />
+            </UFormField>
+            <dl
+              v-if="resolutionMask"
+              class="mt-2 space-y-1.5 text-xs"
+            >
+              <div class="flex justify-between gap-2">
+                <dt class="text-muted">
+                  Inhalt (LED)
+                </dt>
+                <dd class="text-right font-medium">
+                  {{ formatIntegerDe(resolutionMask.rulerLabels.contentWidthPx) }}×{{ formatIntegerDe(resolutionMask.rulerLabels.contentHeightPx) }} px
+                  · {{ formatMmPairDe(resolutionMask.rulerLabels.contentWidthMm, resolutionMask.rulerLabels.contentHeightMm) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-muted">
+                  Ungenutzte LED-Pixel
+                </dt>
+                <dd class="text-right font-medium">
+                  {{ formatIntegerDe(resolutionMask.unusedLedPixels) }}
+                  ({{ resolutionMask.unusedLedPercent.toFixed(1) }} %)
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-muted">
+                  Ungenutzte Fläche
+                </dt>
+                <dd class="text-right font-medium">
+                  {{ formatAreaM2De(resolutionMask.unusedAreaM2) }}
+                </dd>
+              </div>
+              <div
+                v-if="resolutionMask.fitMode === 'cover'"
+                class="flex justify-between gap-2"
+              >
+                <dt class="text-muted">
+                  Abgeschnittener Inhalt
+                </dt>
+                <dd class="text-right font-medium">
+                  {{ resolutionMask.croppedContentPercent.toFixed(1) }} %
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-muted">
+                  Skalierung (Quelle → LED)
+                </dt>
+                <dd class="text-right font-medium">
+                  ×{{ resolutionMask.scaleLedPerSource.toFixed(3) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-muted">
+                  Wand-Raster
+                </dt>
+                <dd class="text-right font-medium">
+                  {{ formatIntegerDe(resolutionMask.rulerLabels.ledWidthPx) }}×{{ formatIntegerDe(resolutionMask.rulerLabels.ledHeightPx) }} px
+                </dd>
+              </div>
+            </dl>
+            <p
+              v-else
+              class="text-xs text-warning"
+            >
+              Maske nicht berechenbar (uneinheitlicher Pitch oder keine aktiven Panels).
+            </p>
+            <p class="text-[10px] text-muted">
+              Rahmen auf der Wand verschieben. Schattiert = Verschnitt (ungenutzte LED-Fläche).
+            </p>
+          </template>
+        </InspectorSection>
         <UFormField label="Testbild auf Wand">
           <div class="space-y-2">
             <UCheckbox

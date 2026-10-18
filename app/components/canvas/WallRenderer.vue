@@ -6,8 +6,12 @@ import { useTestPatternCache } from '~/composables/useTestPatternCache'
 import type { LEDWall } from '#shared/types/wall'
 import { wallLocalBoundingBox } from '#shared/calculations/geometry'
 import { formatMmDe } from '#shared/format/de-de'
+import ResolutionMaskOverlay from '~/components/canvas/ResolutionMaskOverlay.vue'
+import { useResolutionMask } from '~/composables/useResolutionMask'
 import { useEditorStore } from '~/stores/editor'
+import { useHistoryStore } from '~/stores/history'
 import { useProjectStore } from '~/stores/project'
+import { roundPositionMm } from '#shared/utils/position'
 
 const props = defineProps<{
   wall: LEDWall
@@ -30,6 +34,9 @@ const emit = defineEmits<{
 
 const project = useProjectStore()
 const editor = useEditorStore()
+const history = useHistoryStore()
+const maskAnalysis = useResolutionMask(() => props.wall)
+const maskDragActive = ref(false)
 const { getWallPatternUrl } = useTestPatternCache()
 const groupRef = ref<{ getNode: () => Konva.Group } | null>(null)
 
@@ -134,6 +141,23 @@ function onWallContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
     wallId: props.wall.id
   }
   emit('selectWall', false)
+}
+
+function onMaskOffset(xMm: number, yMm: number) {
+  if (!maskDragActive.value) {
+    history.beginDrag()
+    maskDragActive.value = true
+  }
+  project.updateWall(props.wall.id, {
+    resolutionMaskOffsetLocalXMm: roundPositionMm(xMm),
+    resolutionMaskOffsetLocalYMm: roundPositionMm(yMm)
+  })
+}
+
+function onMaskDragEnd() {
+  if (!maskDragActive.value) return
+  history.endDrag()
+  maskDragActive.value = false
 }
 
 function onPanelContext(panelId: string, evt: MouseEvent) {
@@ -265,6 +289,14 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         }"
       />
     </template>
+    <ResolutionMaskOverlay
+      v-if="wall.resolutionMaskEnabled && maskAnalysis"
+      :wall="wall"
+      :analysis="maskAnalysis"
+      :zoom="zoom"
+      @offset-change="onMaskOffset"
+      @drag-end="onMaskDragEnd"
+    />
     <PanelRenderer
       v-for="panel in panelsPaintOrder"
       :key="panel.id"

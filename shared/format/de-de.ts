@@ -13,6 +13,16 @@ export function formatIntegerDe(value: number): string {
   return integerFormatter.format(Math.round(value))
 }
 
+/** Whole millimetres with unit, e.g. `4.000 mm` or `357 mm` (de-DE). */
+export function formatMmDe(valueMm: number): string {
+  if (!Number.isFinite(valueMm)) return '—'
+  return `${formatIntegerDe(valueMm)} mm`
+}
+
+export function formatMmPairDe(widthMm: number, heightMm: number): string {
+  return `${formatIntegerDe(widthMm)} × ${formatIntegerDe(heightMm)} mm`
+}
+
 export function formatDecimalDe(value: number, decimals = 2): string {
   if (!Number.isFinite(value)) return '—'
   return decimalFormatter(decimals).format(value)

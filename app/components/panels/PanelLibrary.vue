@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PanelDefinition } from '#shared/types/panel'
+import { formatMmPairDe } from '#shared/format/de-de'
 import { pitchXMm, pitchYMm } from '#shared/types/panel'
 
 defineProps<{
@@ -48,7 +49,7 @@ function onDragStart(e: DragEvent, defId: string) {
           />
         </div>
         <div class="text-muted">
-          {{ def.widthMm }}×{{ def.heightMm }} mm · {{ def.resolutionX }}×{{ def.resolutionY }} px
+          {{ formatMmPairDe(def.widthMm, def.heightMm) }} · {{ def.resolutionX }}×{{ def.resolutionY }} px
         </div>
         <div class="text-muted">
           {{ formatPitch(def) }}

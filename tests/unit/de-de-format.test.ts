@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDecimalDe,
   formatIntegerDe,
+  formatMmDe,
+  formatMmPairDe,
   formatMetersPair,
   formatPhysicalAspectDisplay,
   formatPitchPairMm,
@@ -13,6 +15,12 @@ describe('de-DE formatting', () => {
   it('formats integers with dot thousands separator', () => {
     expect(formatIntegerDe(1843200)).toBe('1.843.200')
     expect(formatIntegerDe(1920)).toBe('1.920')
+  })
+
+  it('formats whole millimetres', () => {
+    expect(formatMmDe(4000)).toBe('4.000 mm')
+    expect(formatMmDe(357)).toBe('357 mm')
+    expect(formatMmPairDe(500, 1000)).toBe('500 × 1.000 mm')
   })
 
   it('formats decimals with comma', () => {

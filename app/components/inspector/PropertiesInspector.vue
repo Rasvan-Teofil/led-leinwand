@@ -5,10 +5,9 @@ import { WARNING_LABELS_DE } from '#shared/i18n/messages-de'
 import type { TestPatternKind } from '#shared/types/wall'
 import { useDeleteActions } from '~/composables/useDeleteActions'
 import { useWallMetrics } from '~/composables/useWallMetrics'
-import { useWallOverviewSummary } from '~/composables/useWallOverviewSummary'
 import { useEditorStore } from '~/stores/editor'
 import { useHistoryStore } from '~/stores/history'
-import { formatIntegerDe } from '#shared/format/de-de'
+import { formatIntegerDe, formatMmPairDe } from '#shared/format/de-de'
 import { roundPositionMm } from '#shared/utils/position'
 import { useProjectStore } from '~/stores/project'
 
@@ -38,7 +37,6 @@ const panelDef = computed(() =>
 )
 
 const metrics = useWallMetrics(() => wall.value)
-const overview = useWallOverviewSummary()
 
 function rotatePanel(deg: RotationDeg) {
   if (!wall.value || !panel.value) return
@@ -70,10 +68,6 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
 
 <template>
   <div class="space-y-4 p-3 text-sm">
-    <WallsWallGesamtuebersichtCard
-      title="Gesamtübersicht"
-      :summary="overview"
-    />
     <template v-if="wall && !panel">
       <h3 class="font-semibold">
         Wand-Eigenschaften
@@ -135,7 +129,7 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
             BBox
           </dt>
           <dd class="font-mono text-highlighted">
-            {{ metrics.dims.bboxWidthMm }}×{{ metrics.dims.bboxHeightMm }} mm
+            {{ formatMmPairDe(metrics.dims.bboxWidthMm, metrics.dims.bboxHeightMm) }}
           </dd>
         </div>
         <div class="flex justify-between">
@@ -211,7 +205,7 @@ function updateTestPattern(patch: { enabled?: boolean, kind?: TestPatternKind })
         />
       </UFormField>
       <dl class="space-y-1 text-xs text-muted">
-        <div>Physikalisch: {{ panelDef.widthMm }}×{{ panelDef.heightMm }} mm</div>
+        <div>Physikalisch: {{ formatMmPairDe(panelDef.widthMm, panelDef.heightMm) }}</div>
         <div>Pixel: {{ panelDef.resolutionX }}×{{ panelDef.resolutionY }}</div>
         <div>Pitch: {{ pitchXMm(panelDef).toFixed(3) }}×{{ pitchYMm(panelDef).toFixed(3) }} mm</div>
       </dl>

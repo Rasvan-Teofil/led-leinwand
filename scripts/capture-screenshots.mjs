@@ -14,7 +14,24 @@ await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('[data-testid="canvas-container"] canvas', { timeout: 30_000 })
 await page.getByTestId('canvas-fit-all').click()
 await page.screenshot({ path: path.join(outDir, 'editor-dark.png'), fullPage: true })
+const overviewCount = await page.locator('[data-testid="gesamtuebersicht-card"]').count()
+if (overviewCount !== 1) {
+  throw new Error(`Expected exactly one Gesamtübersicht card, found ${overviewCount}`)
+}
+await page.screenshot({ path: path.join(outDir, 'editor-dashboard-overview.png'), fullPage: true })
 await page.getByRole('button', { name: /Jinyuan 4/ }).click()
+await page.evaluate(() => {
+  const api = window.__ledDesignerTest
+  if (!api) return
+  const wall = api.project.walls.find(w => w.name.includes('Jinyuan'))
+  const panel = wall?.panels.find(p => p.xMm === 500 && p.yMm === 0)
+  if (!wall || !panel) return
+  api.editor.setZoom(0.18)
+  api.editor.setPan(200, 140)
+  api.editor.selectPanel(wall.id, panel.id)
+})
+await page.waitForTimeout(400)
+await page.screenshot({ path: path.join(outDir, 'editor-selected-panel.png'), fullPage: true })
 await page.locator('[data-testid="gesamtuebersicht-card"]').first().waitFor({ state: 'visible', timeout: 10_000 })
 await page.evaluate(() => {
   const api = window.__ledDesignerTest

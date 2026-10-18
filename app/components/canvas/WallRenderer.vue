@@ -5,6 +5,7 @@ import PanelRenderer from '~/components/canvas/PanelRenderer.vue'
 import { useTestPatternCache } from '~/composables/useTestPatternCache'
 import type { LEDWall } from '#shared/types/wall'
 import { wallLocalBoundingBox } from '#shared/calculations/geometry'
+import { formatMmDe } from '#shared/format/de-de'
 import { useEditorStore } from '~/stores/editor'
 import { useProjectStore } from '~/stores/project'
 
@@ -46,6 +47,13 @@ const wallSelected = computed(() =>
   editor.selection.wallIds.includes(props.wall.id)
 )
 
+const panelsPaintOrder = computed(() => {
+  const selected = new Set(editor.selection.panelIds)
+  const rest = props.wall.panels.filter(p => !selected.has(p.id))
+  const sel = props.wall.panels.filter(p => selected.has(p.id))
+  return [...rest, ...sel]
+})
+
 const groupConfig = computed(() => ({
   x: props.panX + props.wall.xMm * props.zoom,
   y: props.panY + props.wall.yMm * props.zoom,
@@ -65,8 +73,8 @@ const dimensionOverlay = computed(() => {
   return {
     hLine: [x, y + h + 16, x + w, y + h + 16],
     vLine: [x - 16, y, x - 16, y + h],
-    widthLabel: `${bbox.value.widthMm} mm`,
-    heightLabel: `${bbox.value.heightMm} mm`,
+    widthLabel: formatMmDe(bbox.value.widthMm),
+    heightLabel: formatMmDe(bbox.value.heightMm),
     widthText: { x: x + w / 2 - 30, y: y + h + 22 },
     heightText: { x: x - 72, y: y + h / 2 - 6 }
   }
@@ -159,8 +167,11 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         height: bbox.heightMm * zoom,
         stroke: wallSelected ? '#ffffff' : '#525252',
         strokeWidth: wallSelected ? 2 : 1,
-        dash: [6, 4],
-        fill: wall.testPatternEnabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
+        dash: wallSelected ? [] : [6, 4],
+        fill: wallSelected
+          ? (wall.testPatternEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.12)')
+          : (wall.testPatternEnabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)'),
+        strokeScaleEnabled: false,
         listening: true,
         name: 'wall-frame'
       }"
@@ -176,6 +187,21 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         image: patternImage,
         listening: false,
         opacity: 0.92
+      }"
+    />
+    <Rect
+      v-if="bbox && wallSelected"
+      :config="{
+        x: bbox.xMm * zoom,
+        y: bbox.yMm * zoom,
+        width: bbox.widthMm * zoom,
+        height: bbox.heightMm * zoom,
+        stroke: '#ffffff',
+        strokeWidth: 2,
+        dash: [6, 4],
+        fill: 'rgba(255,255,255,0.08)',
+        listening: false,
+        strokeScaleEnabled: false
       }"
     />
     <Rect
@@ -242,7 +268,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       />
     </template>
     <PanelRenderer
-      v-for="panel in wall.panels"
+      v-for="panel in panelsPaintOrder"
       :key="panel.id"
       :panel="panel"
       :wall-id="wall.id"

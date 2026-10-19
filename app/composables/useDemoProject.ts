@@ -9,42 +9,35 @@ export function seedDemoProject() {
   const history = useHistoryStore()
   const persistence = useProjectPersistence()
 
-  project.newProject('Demo LED Projekt')
-  const jinyuan500 = project.panelDefinitions.find(d => d.id === 'jinyuan-p391-500x500')
-  const jinyuan1000 = project.panelDefinitions.find(d => d.id === 'jinyuan-p391-500x1000')
-  const generic500 = project.panelDefinitions.find(d => d.id.startsWith('preset-500x500'))
-  if (!jinyuan500 || !jinyuan1000 || !generic500) return
+  project.newProject('LED-Angebotsvergleich')
+  const offers = [
+    {
+      name: 'Angebot 1 · Jinyuan 4×2,5 m (P3.91)',
+      xMm: 0,
+      squareId: 'jinyuan-p391-500x500',
+      tallId: 'jinyuan-p391-500x1000'
+    },
+    {
+      name: 'Angebot 2 · 4×2,5 m (P2.6)',
+      xMm: 5000,
+      squareId: 'offer-2-p26-500x500',
+      tallId: 'offer-2-p26-500x1000'
+    }
+  ]
 
   history.pushHistory()
-  const rectId = project.addWall('Jinyuan 4×2,5 m')
-  if (rectId) {
-    project.updateWall(rectId, {
-      xMm: 0,
+  for (const offer of offers) {
+    const wallId = project.addWall(offer.name)
+    project.updateWall(wallId, {
+      xMm: offer.xMm,
       yMm: 0,
       panelLayoutMode: 'auto'
     })
     for (let col = 0; col < 8; col++) {
       const x = col * 500
-      project.addPanel(rectId, jinyuan1000.id, x, 0)
-      project.addPanel(rectId, jinyuan1000.id, x, 1000)
-      project.addPanel(rectId, jinyuan500.id, x, 2000)
-    }
-  }
-
-  const lId = project.addWall('L-Form Irregular')
-  if (lId) {
-    project.updateWall(lId, { xMm: 5000, yMm: 0 })
-    const positions: Array<[number, number]> = [
-      [0, 0],
-      [500, 0],
-      [1000, 0],
-      [0, 500],
-      [0, 1000],
-      [500, 1000],
-      [1000, 500]
-    ]
-    for (const [x, y] of positions) {
-      project.addPanel(lId, generic500.id, x, y)
+      project.addPanel(wallId, offer.tallId, x, 0)
+      project.addPanel(wallId, offer.tallId, x, 1000)
+      project.addPanel(wallId, offer.squareId, x, 2000)
     }
   }
   history.pushHistory()

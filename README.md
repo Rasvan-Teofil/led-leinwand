@@ -49,3 +49,5 @@ The project uses the Nuxt `vercel` Nitro preset. Connect the repo and use the de
 - `tests/e2e/` — Playwright flows
 
 Panel presets include generic examples (not verified commercial specs) and Jinyuan P3.91 quote panels.
+
+The default project compares two 4 × 2.5 m offers with identical layouts: Jinyuan P3.91 and P2.6, each with 16 cabinets of 500 × 1000 mm and 8 cabinets of 500 × 500 mm. The P2.6 calculation model assumes 192 pixels per 500 mm (192 × 192 / 192 × 384); exact supplier resolutions can be edited in the panel library. Load these defaults for an existing browser project through settings → **Standardangebote laden**.

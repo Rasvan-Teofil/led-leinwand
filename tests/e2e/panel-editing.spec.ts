@@ -13,10 +13,10 @@ test.describe('Panel editing (real mouse)', () => {
 
   test('add panel from library via drag', async ({ page }) => {
     await readyCanvas(page)
-    await page.getByRole('button', { name: /L-Form/ }).click()
+    await page.getByRole('button', { name: /Angebot 2/ }).click()
     const before = await page.evaluate(() => {
       const w = window.__ledDesignerTest!.project.walls.find(wall =>
-        wall.name.includes('L-Form')
+        wall.name.includes('Angebot 2')
       )!
       return { wallId: w.id, count: w.panels.length }
     })
@@ -26,7 +26,7 @@ test.describe('Panel editing (real mouse)', () => {
     const libBox = await lib.boundingBox()
     const dropPoint = await page.evaluate(() => {
       const api = window.__ledDesignerTest!
-      const wall = api.project.walls.find(w => w.name.includes('L-Form'))!
+      const wall = api.project.walls.find(w => w.name.includes('Angebot 2'))!
       const canvasEl = document.querySelector('[data-testid="canvas-container"] canvas')!
       const bounds = canvasEl.getBoundingClientRect()
       const z = api.editor.zoom
@@ -116,7 +116,7 @@ test.describe('Panel editing (real mouse)', () => {
     await readyCanvas(page)
     const ctx = await page.evaluate(() => {
       const api = window.__ledDesignerTest!
-      const wall = api.project.walls.find(w => w.name.includes('L-Form'))!
+      const wall = api.project.walls.find(w => w.name.includes('Angebot 2'))!
       const panel = wall.panels[0]!
       api.editor.selectWall(wall.id)
       const handle = api.getWallDragHandleClientPoint(wall.id)

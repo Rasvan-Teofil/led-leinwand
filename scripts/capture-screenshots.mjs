@@ -168,7 +168,7 @@ await page.waitForTimeout(300)
 const wallDrag = await page.evaluate(() => {
   const api = window.__ledDesignerTest
   if (!api) return null
-  const wall = api.project.walls.find(w => w.name.includes('L-Form'))
+  const wall = api.project.walls.find(w => w.name.includes('Angebot 2'))
   if (!wall) return null
   api.editor.setZoom(0.08)
   api.editor.setPan(60, 50)

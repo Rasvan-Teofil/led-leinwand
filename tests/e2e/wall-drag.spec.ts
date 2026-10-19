@@ -13,7 +13,7 @@ test.describe('Wall drag', () => {
     const ctx = await page.evaluate(() => {
       const api = window.__ledDesignerTest
       if (!api) throw new Error('hooks')
-      const wall = api.project.walls.find(w => w.name.includes('L-Form'))
+      const wall = api.project.walls.find(w => w.name.includes('Angebot 2'))
       if (!wall) throw new Error('wall')
       api.editor.setZoom(0.08)
       api.editor.setPan(60, 50)

@@ -75,6 +75,29 @@ export const BUILTIN_PANEL_PRESETS: PanelDefinition[] = [
     resolutionY: 256,
     nominalPitchMm: 3.91,
     disclaimer: 'From supplier quote — verify before ordering.'
+  }),
+  // P2.6 is nominal: use the same 192-pixel raster per 500 mm for both sizes.
+  preset({
+    id: 'offer-2-p26-500x500',
+    name: 'Angebot 2 P2.6 500×500',
+    model: 'P2.6',
+    widthMm: 500,
+    heightMm: 500,
+    resolutionX: 192,
+    resolutionY: 192,
+    nominalPitchMm: 2.6,
+    disclaimer: 'Rechenmodell: 192 Pixel je 500 mm; genaue Auflösung mit dem Angebot abgleichen.'
+  }),
+  preset({
+    id: 'offer-2-p26-500x1000',
+    name: 'Angebot 2 P2.6 500×1000',
+    model: 'P2.6',
+    widthMm: 500,
+    heightMm: 1000,
+    resolutionX: 192,
+    resolutionY: 384,
+    nominalPitchMm: 2.6,
+    disclaimer: 'Rechenmodell: 192 Pixel je 500 mm; genaue Auflösung mit dem Angebot abgleichen.'
   })
 ]
 

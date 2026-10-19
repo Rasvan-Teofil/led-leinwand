@@ -7,6 +7,53 @@ test.describe('LED Wall Designer', () => {
     })
   })
 
+  test('default offers have identical cabinet layouts and uniform P3.91/P2.6 rasters', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await expect(page.getByRole('button', { name: /Angebot 1/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Angebot 2/ })).toBeVisible()
+    const offers = await page.evaluate(async () => {
+      const api = window.__ledDesignerTest!
+      return Promise.all(api.project.walls.map(async wall => ({
+        name: wall.name,
+        layout: wall.panels.map((panel) => {
+          const def = api.project.defsById.get(panel.panelDefinitionId)!
+          return {
+            x: panel.xMm,
+            y: panel.yMm,
+            width: def.widthMm,
+            height: def.heightMm,
+            rotation: panel.rotation
+          }
+        }),
+        nominalPitches: [...new Set(wall.panels.map(panel =>
+          api.project.defsById.get(panel.panelDefinitionId)!.nominalPitchMm
+        ))],
+        pattern: await api.assertWallTestPatternCoverage(wall.id)
+      })))
+    })
+    expect(offers).toHaveLength(2)
+    expect(offers[1]!.layout).toEqual(offers[0]!.layout)
+    expect(offers[0]!.layout.filter(panel => panel.height === 1000)).toHaveLength(16)
+    expect(offers[0]!.layout.filter(panel => panel.height === 500)).toHaveLength(8)
+    expect(Math.max(...offers[0]!.layout.map(panel => panel.x + panel.width))).toBe(4000)
+    expect(Math.max(...offers[0]!.layout.map(panel => panel.y + panel.height))).toBe(2500)
+    expect(offers[0]!.nominalPitches).toEqual([3.91])
+    expect(offers[1]!.nominalPitches).toEqual([2.6])
+    expect(offers[0]!.pattern).toEqual({ ok: true, missingPanelIds: [], resolution: { x: 1024, y: 640 } })
+    expect(offers[1]!.pattern).toEqual({ ok: true, missingPanelIds: [], resolution: { x: 1536, y: 960 } })
+
+    await page.evaluate(() => window.__ledDesignerTest!.project.renameProject('Eigene Planung'))
+    await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+    await page.getByTestId('reset-demo-button').click()
+    await expect(page.getByRole('dialog', { name: 'Standardangebote laden?' })).toBeVisible()
+    expect(await page.evaluate(() => window.__ledDesignerTest!.project.project.name)).toBe('Eigene Planung')
+    await page.getByTestId('reset-demo-confirm').click()
+    await expect.poll(() => page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('led-wall-designer:project')!)
+      return { name: saved.name, walls: saved.walls.map((wall: { name: string }) => wall.name) }
+    })).toEqual({ name: 'LED-Angebotsvergleich', walls: offers.map(offer => offer.name) })
+  })
+
   test('open app, canvas renders walls, save, reload, export json', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByText('LED Wall Designer')).toBeVisible()

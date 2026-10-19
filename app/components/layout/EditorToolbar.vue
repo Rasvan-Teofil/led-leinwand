@@ -170,6 +170,7 @@ watch(
         color="neutral"
         variant="ghost"
         icon="i-lucide-settings"
+        aria-label="Einstellungen"
         @click="settingsOpen = !settingsOpen"
       />
     </div>
@@ -195,7 +196,7 @@ watch(
             variant="outline"
             color="neutral"
             icon="i-lucide-rotate-ccw"
-            label="Demo zurücksetzen"
+            label="Standardangebote laden"
             data-testid="reset-demo-button"
             @click="resetDemoOpen = true"
           />
@@ -205,11 +206,12 @@ watch(
 
     <UModal
       v-model:open="resetDemoOpen"
-      title="Demo zurücksetzen?"
+      title="Standardangebote laden?"
     >
       <template #body>
         <p class="text-sm text-muted">
-          Das gespeicherte Projekt wird gelöscht und die Demo-Wände (Jinyuan 8×3, L-Form) neu geladen.
+          Das aktuelle Projekt wird durch die beiden Angebote ersetzt: Jinyuan P3.91 und P2.6,
+          jeweils mit gleichem Aufbau in 4 × 2,5 m.
           Eigene Änderungen gehen verloren.
         </p>
       </template>
@@ -222,7 +224,7 @@ watch(
           />
           <UButton
             color="neutral"
-            label="Zurücksetzen"
+            label="Angebote laden"
             data-testid="reset-demo-confirm"
             @click="confirmResetDemo"
           />

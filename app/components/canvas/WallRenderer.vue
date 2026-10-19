@@ -39,6 +39,7 @@ const maskAnalysis = useResolutionMask(() => props.wall)
 const maskDragActive = ref(false)
 const { getWallPatternUrl } = useTestPatternCache()
 const groupRef = ref<{ getNode: () => Konva.Group } | null>(null)
+const wallDragFromTag = ref(false)
 
 const patternUrl = computed(() => {
   if (!props.wall.testPatternEnabled) return ''
@@ -53,6 +54,7 @@ const bbox = computed(() =>
 const wallSelected = computed(() =>
   editor.selection.wallIds.includes(props.wall.id)
 )
+const tagWidth = computed(() => Math.max(100, Math.min(200, props.wall.name.length * 7 + 16)))
 
 const panelsPaintOrder = computed(() => {
   const selected = new Set(editor.selection.panelIds)
@@ -100,25 +102,38 @@ function localOriginFromNode(node: Konva.Node) {
 }
 
 function onHandleMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
-  if (!editor.canManipulateObjects || props.wall.locked) return
+  if (e.evt.button !== 0 || !editor.canManipulateObjects || props.wall.locked) return
   e.cancelBubble = true
   emit('selectWall', false)
-  groupRef.value?.getNode()?.startDrag()
+  wallDragFromTag.value = true
+  groupRef.value?.getNode()?.startDrag(e)
 }
 
-function onWallDragStart() {
-  emit('selectWall', false)
+function onWallDragStart(e: Konva.KonvaEventObject<DragEvent>) {
+  if (e.target !== e.currentTarget || !wallDragFromTag.value) return
   emit('wallDragStart')
 }
 
 function onWallDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+  if (e.target !== e.currentTarget || !wallDragFromTag.value) return
   const pos = localOriginFromNode(e.target)
   emit('wallDragMove', pos.xMm, pos.yMm)
+  syncWallPosition(e.target)
 }
 
 function onWallDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
+  if (e.target !== e.currentTarget || !wallDragFromTag.value) return
   const pos = localOriginFromNode(e.target)
   emit('wallDragEnd', pos.xMm, pos.yMm)
+  wallDragFromTag.value = false
+  syncWallPosition(e.target)
+}
+
+function syncWallPosition(node: Konva.Node) {
+  node.position({
+    x: props.panX + props.wall.xMm * props.zoom,
+    y: props.panY + props.wall.yMm * props.zoom
+  })
 }
 
 watch(
@@ -126,10 +141,7 @@ watch(
   () => {
     const node = groupRef.value?.getNode()
     if (!node || !editor.canvasDraggingWall) return
-    node.position({
-      x: props.panX + props.wall.xMm * props.zoom,
-      y: props.panY + props.wall.yMm * props.zoom
-    })
+    syncWallPosition(node)
   }
 )
 
@@ -231,7 +243,7 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
       :config="{
         x: bbox.xMm * zoom,
         y: bbox.yMm * zoom - 22,
-        width: Math.min(160, bbox.widthMm * zoom),
+        width: tagWidth,
         height: 18,
         fill: 'rgba(255,255,255,0.06)',
         stroke: wallSelected ? '#ffffff' : '#525252',
@@ -246,6 +258,10 @@ function onPanelContext(panelId: string, evt: MouseEvent) {
         x: (bbox?.xMm ?? 0) * zoom + 6,
         y: (bbox?.yMm ?? 0) * zoom - 18,
         text: wall.name,
+        width: tagWidth - 12,
+        height: 14,
+        wrap: 'none',
+        ellipsis: true,
         fontSize: 11,
         fill: '#a3a3a3',
         listening: false

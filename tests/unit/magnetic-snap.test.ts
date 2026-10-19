@@ -24,6 +24,42 @@ function neighbor(
 }
 
 describe('resolveMagneticSnap', () => {
+  it('assigns an adjacent target wall even when a distant wall shares the same guide', () => {
+    const result = resolveMagneticSnap({
+      proposedXMm: 1500,
+      proposedYMm: 0,
+      widthMm: 500,
+      heightMm: 500,
+      zoom: 0.2,
+      thresholdPx: 12,
+      gridMm: 50,
+      magneticEnabled: true,
+      gridSnapEnabled: true,
+      neighbors: [
+        neighbor('source', 500, 0, 500, 500, 'source-wall'),
+        neighbor('target', 2000, 0, 500, 500, 'target-wall')
+      ]
+    })
+    expect(result).toMatchObject({ xMm: 1500, yMm: 0, referenceWallId: 'target-wall' })
+  })
+
+  it('does not assign a distant wall just because a panel aligns with its guide', () => {
+    const result = resolveMagneticSnap({
+      proposedXMm: 1500,
+      proposedYMm: 0,
+      widthMm: 500,
+      heightMm: 500,
+      zoom: 0.2,
+      thresholdPx: 12,
+      gridMm: 50,
+      magneticEnabled: true,
+      gridSnapEnabled: true,
+      neighbors: [neighbor('distant', 500, 0, 500, 500, 'distant-wall')]
+    })
+    expect(result.referenceWallId).toBeUndefined()
+    expect(result.xMm).toBe(1500)
+  })
+
   it('snaps to the nearest right-adjacent non-overlapping position', () => {
     const neighbors = [neighbor('a', 0, 0, 500, 500)]
     const result = resolveMagneticSnap({

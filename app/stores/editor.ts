@@ -38,6 +38,12 @@ export const useEditorStore = defineStore('editor', {
     } | null,
     canvasDragging: false,
     canvasDraggingWall: false,
+    panelDragPreview: null as {
+      panelId: string
+      xMm: number
+      yMm: number
+      invalid: boolean
+    } | null,
     pendingDeleteWallId: null as string | null,
     snapGuides: [] as SnapGuideLine[],
     snapOverrideDisabled: false,

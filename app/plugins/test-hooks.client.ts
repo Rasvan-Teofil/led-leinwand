@@ -1,3 +1,4 @@
+import Konva from 'konva'
 import { wallLocalBoundingBox } from '#shared/calculations/geometry'
 import { occupiedSizeMm } from '#shared/types/panel'
 import {
@@ -12,12 +13,28 @@ export interface LedDesignerTestHooks {
   editor: ReturnType<typeof useEditorStore>
   project: ReturnType<typeof useProjectStore>
   getPanelClientCenter: (wallId: string, panelId: string) => { x: number, y: number } | null
+  getPanelRenderedClientCenter: (panelId: string) => { x: number, y: number, dragging: boolean } | null
   getWallDragHandleClientPoint: (wallId: string) => { x: number, y: number } | null
   assertWallTestPatternCoverage: (wallId: string) => Promise<{
     ok: boolean
     missingPanelIds: string[]
     resolution: { x: number, y: number }
   }>
+}
+
+function getPanelRenderedClientCenter(panelId: string) {
+  for (const stage of Konva.stages) {
+    const node = stage.findOne(`#${panelId}`)
+    if (!node) continue
+    const rect = node.getClientRect()
+    const bounds = stage.container().getBoundingClientRect()
+    return {
+      x: bounds.left + rect.x + rect.width / 2,
+      y: bounds.top + rect.y + rect.height / 2,
+      dragging: node.isDragging()
+    }
+  }
+  return null
 }
 
 function getWallDragHandleClientPoint(wallId: string) {
@@ -127,6 +144,7 @@ export default defineNuxtPlugin(() => {
     editor: useEditorStore(),
     project: useProjectStore(),
     getPanelClientCenter,
+    getPanelRenderedClientCenter,
     getWallDragHandleClientPoint,
     assertWallTestPatternCoverage
   }

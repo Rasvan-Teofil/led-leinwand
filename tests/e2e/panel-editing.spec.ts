@@ -23,7 +23,6 @@ test.describe('Panel editing (real mouse)', () => {
 
     const lib = page.getByTestId('library-panel-jinyuan-p391-500x500')
     await lib.scrollIntoViewIfNeeded()
-    const canvas = page.getByTestId('canvas-container')
     const libBox = await lib.boundingBox()
     const dropPoint = await page.evaluate(() => {
       const api = window.__ledDesignerTest!
@@ -47,32 +46,10 @@ test.describe('Panel editing (real mouse)', () => {
     await page.mouse.move(dropX, dropY, { steps: 24 })
     await page.mouse.up()
 
-    const defId = 'jinyuan-p391-500x500'
-    const dataTransfer = await page.evaluateHandle((id) => {
-      const dt = new DataTransfer()
-      dt.setData('text/plain', id)
-      dt.effectAllowed = 'copy'
-      return dt
-    }, defId)
-    await lib.dispatchEvent('dragstart', { dataTransfer })
-    await canvas.dispatchEvent('dragover', {
-      dataTransfer,
-      clientX: dropX,
-      clientY: dropY
-    })
-    await canvas.dispatchEvent('drop', {
-      dataTransfer,
-      clientX: dropX,
-      clientY: dropY
-    })
-    await page.waitForTimeout(400)
-
-    const after = await page.evaluate((wallId) => {
+    await expect.poll(() => page.evaluate((wallId) => {
       const w = window.__ledDesignerTest!.project.walls.find(wall => wall.id === wallId)!
-      return { count: w.panels.length, mode: w.panelLayoutMode }
-    }, before.wallId)
-
-    expect(after.count).toBe(before.count + 1)
+      return w.panels.length
+    }, before.wallId)).toBe(before.count + 1)
   })
 
   test('add panel via Zur Wand hinzufügen button', async ({ page }) => {

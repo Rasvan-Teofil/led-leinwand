@@ -30,6 +30,10 @@ const groupRef = ref<{ getNode: () => Konva.Group } | null>(null)
 const hovered = ref(false)
 
 const def = computed(() => project.defsById.get(props.panel.panelDefinitionId))
+const dragPreview = computed(() =>
+  editor.panelDragPreview?.panelId === props.panel.id ? editor.panelDragPreview : null
+)
+const isInvalid = computed(() => dragPreview.value?.invalid ?? props.invalid)
 
 const geometry = computed(() => {
   if (!def.value) return null
@@ -39,8 +43,8 @@ const geometry = computed(() => {
   const occW = occ.widthMm * props.zoom
   const occH = occ.heightMm * props.zoom
   return {
-    x: props.panel.xMm * props.zoom + occW / 2,
-    y: props.panel.yMm * props.zoom + occH / 2,
+    x: (dragPreview.value?.xMm ?? props.panel.xMm) * props.zoom + occW / 2,
+    y: (dragPreview.value?.yMm ?? props.panel.yMm) * props.zoom + occH / 2,
     offsetX: unrotW / 2,
     offsetY: unrotH / 2,
     width: unrotW,
@@ -52,6 +56,7 @@ const geometry = computed(() => {
 const groupConfig = computed(() => {
   if (!geometry.value) return null
   return {
+    id: props.panel.id,
     ...geometry.value,
     draggable:
       editor.canManipulateObjects
@@ -65,7 +70,7 @@ const bodyConfig = computed(() => {
   const selected = props.selected
   const hover = hovered.value && !selected
   let fill = 'rgba(255, 255, 255, 0.08)'
-  if (props.invalid) {
+  if (isInvalid.value) {
     fill = 'rgba(239, 68, 68, 0.35)'
   } else if (selected) {
     fill = props.testPatternActive
@@ -81,7 +86,7 @@ const bodyConfig = computed(() => {
 
   let stroke = '#525252'
   let strokeWidth = 1
-  if (props.invalid) {
+  if (isInvalid.value) {
     stroke = '#ef4444'
     strokeWidth = selected ? 2 : 1
   } else if (selected) {
@@ -127,9 +132,17 @@ function localTopLeftFromNode(node: Konva.Node) {
 }
 
 function onDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+  e.cancelBubble = true
   const pos = localTopLeftFromNode(e.target)
   if (!pos) return
   emit('dragMove', pos.xMm, pos.yMm)
+  syncNodePosition(e.target)
+}
+
+function syncNodePosition(node: Konva.Node) {
+  if (!geometry.value) return
+  // During drag, render the preview; after release, render the committed position.
+  node.position({ x: geometry.value.x, y: geometry.value.y })
 }
 
 watch(
@@ -138,14 +151,16 @@ watch(
     if (!editor.canvasDragging || !def.value || !geometry.value) return
     const node = groupRef.value?.getNode()
     if (!node) return
-    node.position({ x: geometry.value.x, y: geometry.value.y })
+    syncNodePosition(node)
   }
 )
 
 function onDragEnd(e: Konva.KonvaEventObject<DragEvent>) {
+  e.cancelBubble = true
   const pos = localTopLeftFromNode(e.target)
   if (!pos) return
   emit('dragEnd', pos.xMm, pos.yMm)
+  syncNodePosition(e.target)
 }
 
 function onContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
@@ -170,7 +185,7 @@ function onContextMenu(e: Konva.KonvaEventObject<PointerEvent>) {
   >
     <Rect :config="bodyConfig" />
     <Rect
-      v-if="selected && !invalid"
+      v-if="selected && !isInvalid"
       :config="{
         x: 0,
         y: 0,

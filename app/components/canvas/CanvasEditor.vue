@@ -39,8 +39,6 @@ const panStart = { x: 0, y: 0, panX: 0, panY: 0 }
 const dragPanelStart = ref<{
   wallId: string
   panelId: string
-  originLocalXMm: number
-  originLocalYMm: number
 } | null>(null)
 const dragWallStart = ref<{
   wallId: string
@@ -184,88 +182,52 @@ function onStageMouseUp() {
 function onPanelDragStart(wallId: string, panelId: string) {
   const wall = project.walls.find(w => w.id === wallId)
   const panel = wall?.panels.find(p => p.id === panelId)
-  if (!wall || !panel) return
-  ensureManualLayout(wallId)
+  if (!wall || !panel || wall.locked || !editor.canManipulateObjects) return
+  if (!editor.selection.panelIds.includes(panelId)) {
+    editor.selectPanel(wallId, panelId)
+  }
   history.beginDrag()
   editor.canvasDragging = true
   dragPanelStart.value = {
     wallId,
-    panelId,
-    originLocalXMm: panel.xMm,
-    originLocalYMm: panel.yMm
+    panelId
   }
 }
 
-function applyPanelPosition(
+function resolvePanelPosition(
   fromWallId: string,
   panelId: string,
   localXMm: number,
   localYMm: number
 ) {
-  let wall = project.walls.find(w => w.id === fromWallId)
-  let panel = wall?.panels.find(p => p.id === panelId)
-  if (!panel) {
-    for (const w of project.walls) {
-      const p = w.panels.find(pp => pp.id === panelId)
-      if (p) {
-        wall = w
-        panel = p
-        break
-      }
-    }
-  }
-  if (!wall || !panel) return
-  const origin = dragPanelStart.value?.panelId === panelId
-    ? {
-        xMm: dragPanelStart.value.originLocalXMm,
-        yMm: dragPanelStart.value.originLocalYMm
-      }
-    : { xMm: panel.xMm, yMm: panel.yMm }
+  const wall = project.walls.find(w => w.id === fromWallId)
+  const panel = wall?.panels.find(p => p.id === panelId)
+  if (!wall || !panel || wall.locked) return null
   const def = project.defsById.get(panel.panelDefinitionId)
-  if (!def) return
+  if (!def) return null
   const size = occupiedSizeMm(def, panel.rotation)
 
-  let snapped = snapOnWallLocal(
+  const snapped = snapOnWallLocal(
     fromWallId,
     localXMm,
     localYMm,
     panel.panelDefinitionId,
     panel.rotation,
-    panelId,
-    origin
+    panelId
   )
-  const targetWall = project.walls.find(w => w.id === snapped.wallId) ?? wall
-  const worldX = targetWall.xMm + snapped.localXMm
-  const worldY = targetWall.yMm + snapped.localYMm
-  if (
-    !isWorldTopLeftFree(worldX, worldY, size.widthMm, size.heightMm, panelId)
-  ) {
-    snapped = {
-      wallId: fromWallId,
-      localXMm: origin.xMm,
-      localYMm: origin.yMm,
-      guides: [],
-      mode: 'none'
-    }
-  }
-  editor.setSnapGuides(snapped.guides)
-
-  const currentHost = project.walls.find(w =>
-    w.panels.some(p => p.id === panelId)
-  )
-  const hostId = currentHost?.id ?? fromWallId
-
-  if (snapped.wallId === hostId) {
-    project.movePanel(hostId, panelId, snapped.localXMm, snapped.localYMm)
-  } else {
-    project.movePanelToWall(
-      hostId,
-      panelId,
-      snapped.wallId,
-      snapped.localXMm,
-      snapped.localYMm
-    )
-    editor.selectPanel(snapped.wallId, panelId)
+  const referenceWall = project.walls.find(w => w.id === snapped.wallId) ?? wall
+  const worldX = referenceWall.xMm + snapped.localXMm
+  const worldY = referenceWall.yMm + snapped.localYMm
+  // A locked neighbor can be an alignment reference, but cannot receive panels.
+  const targetWall = referenceWall.locked ? wall : referenceWall
+  return {
+    targetWall,
+    xMm: worldX - targetWall.xMm,
+    yMm: worldY - targetWall.yMm,
+    previewXMm: worldX - wall.xMm,
+    previewYMm: worldY - wall.yMm,
+    invalid: !isWorldTopLeftFree(worldX, worldY, size.widthMm, size.heightMm, panelId),
+    guides: snapped.guides
   }
 }
 
@@ -275,7 +237,18 @@ function onPanelDragMove(
   xMm: number,
   yMm: number
 ) {
-  applyPanelPosition(wallId, panelId, xMm, yMm)
+  if (dragPanelStart.value?.panelId !== panelId || dragPanelStart.value.wallId !== wallId) return
+  const placement = resolvePanelPosition(wallId, panelId, xMm, yMm)
+  if (!placement) return
+  // Keep the Konva node in its original wall until mouseup. Reparenting it during
+  // a drag destroys the node and interrupts the pointer gesture.
+  editor.panelDragPreview = {
+    panelId,
+    xMm: placement.previewXMm,
+    yMm: placement.previewYMm,
+    invalid: placement.invalid
+  }
+  editor.setSnapGuides(placement.guides)
 }
 
 function onPanelDragEnd(
@@ -284,10 +257,22 @@ function onPanelDragEnd(
   xMm: number,
   yMm: number
 ) {
-  applyPanelPosition(wallId, panelId, xMm, yMm)
+  if (dragPanelStart.value?.panelId !== panelId || dragPanelStart.value.wallId !== wallId) return
+  const placement = resolvePanelPosition(wallId, panelId, xMm, yMm)
+  if (placement && !placement.invalid) {
+    ensureManualLayout(wallId)
+    if (placement.targetWall.id === wallId) {
+      project.movePanel(wallId, panelId, placement.xMm, placement.yMm)
+    } else {
+      ensureManualLayout(placement.targetWall.id)
+      project.movePanelToWall(wallId, panelId, placement.targetWall.id, placement.xMm, placement.yMm)
+      editor.selectPanel(placement.targetWall.id, panelId)
+    }
+  }
   history.endDrag()
   dragPanelStart.value = null
   editor.canvasDragging = false
+  editor.panelDragPreview = null
   editor.clearSnapGuides()
 }
 
@@ -430,8 +415,6 @@ defineExpose({ fitAll, resetView })
       isPanning ? 'cursor-grabbing' : ''
     ]"
     data-testid="canvas-container"
-    @dragover.capture.prevent="onCanvasDragOver"
-    @drop.capture.prevent="onCanvasDrop"
     @dragleave="onCanvasDragLeave"
   >
     <Stage

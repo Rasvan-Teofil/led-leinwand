@@ -39,7 +39,7 @@ export interface MagneticSnapResult {
   yMm: number
   mode: 'magnetic' | 'grid' | 'none'
   guides: SnapGuideLine[]
-  /** Wall of the panel used as snap reference (magnetic only). */
+  /** Wall sharing a panel edge with the snapped placement (magnetic only). */
   referenceWallId?: string
 }
 
@@ -244,6 +244,27 @@ function isFree(
   )
 }
 
+function adjacentWallId(
+  rect: RectMm,
+  neighbors: SnapNeighborRect[],
+  excludePanelId?: string,
+  preferredWallId?: string
+): string | undefined {
+  const epsilon = 1e-6
+  const adjacent = neighbors.filter((n) => {
+    if (n.panelId === excludePanelId) return false
+    const overlapX = Math.min(rect.xMm + rect.widthMm, n.xMm + n.widthMm) - Math.max(rect.xMm, n.xMm)
+    const overlapY = Math.min(rect.yMm + rect.heightMm, n.yMm + n.heightMm) - Math.max(rect.yMm, n.yMm)
+    const touchesX = Math.abs(rect.xMm + rect.widthMm - n.xMm) < epsilon
+      || Math.abs(n.xMm + n.widthMm - rect.xMm) < epsilon
+    const touchesY = Math.abs(rect.yMm + rect.heightMm - n.yMm) < epsilon
+      || Math.abs(n.yMm + n.heightMm - rect.yMm) < epsilon
+    return (touchesX && overlapY > epsilon) || (touchesY && overlapX > epsilon)
+  })
+  // A shared guide line alone does not establish membership in another wall.
+  return (adjacent.find(n => n.wallId === preferredWallId) ?? adjacent[0])?.wallId
+}
+
 export function resolveMagneticSnap(
   options: MagneticSnapOptions
 ): MagneticSnapResult {
@@ -286,7 +307,12 @@ export function resolveMagneticSnap(
           yMm: c.yMm,
           mode: 'magnetic',
           guides: c.guides,
-          referenceWallId: c.referenceWallId
+          referenceWallId: adjacentWallId(
+            rectAt(c.xMm, c.yMm, widthMm, heightMm),
+            neighbors,
+            excludePanelId,
+            c.referenceWallId
+          )
         }
       }
     }
